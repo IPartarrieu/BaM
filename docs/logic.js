@@ -113,13 +113,23 @@ export function resumenSemana(sesiones, fecha = new Date()) {
   };
 }
 
-// Nivel 0–1 por grupo: series hechas en los últimos 28 días contra 24 (≈ 1 sesión completa del grupo por semana).
-// ponytail: volumen simple; si se quiere fuerza real, mezclar con la mejora de kg respecto al inicio.
+// Nivel por grupo, dos ejes 0–1:
+//  vol   = series hechas en los últimos 28 días contra 24 (≈ 1 sesión completa del grupo por semana)
+//  carga = subida promedio del kg máximo de cada ejercicio respecto a su primer registro; +25 % llena el eje
+export const SUBIDA_TOPE = 0.25;
 export function niveles(sesiones, fecha = new Date()) {
   const desde = new Date(fecha) - 28 * 864e5;
-  const cuenta = Object.fromEntries(Object.keys(GRUPOS).map(g => [g, 0]));
-  for (const s of sesiones) if (new Date(s.fecha) >= desde) for (const x of s.series) if (x.g in cuenta) cuenta[x.g]++;
-  return Object.fromEntries(Object.entries(cuenta).map(([g, n]) => [g, Math.min(1, n / 24)]));
+  const todas = sesiones.flatMap(s => s.series.map(x => ({ ...x, f: new Date(s.fecha) }))).sort((a, b) => a.f - b.f);
+  return Object.fromEntries(Object.keys(GRUPOS).map(g => {
+    const series = todas.filter(x => x.g === g);
+    const vol = Math.min(1, series.filter(x => x.f >= desde).length / 24);
+    const subidas = [...new Set(series.map(x => x.ex))].map(ex => {
+      const kgs = series.filter(x => x.ex === ex && +x.kg > 0).map(x => +x.kg);
+      return kgs.length > 1 ? Math.max(...kgs) / kgs[0] - 1 : null;
+    }).filter(v => v !== null);
+    const subida = subidas.length ? subidas.reduce((a, b) => a + b, 0) / subidas.length : 0;
+    return [g, { vol, subida, carga: Math.min(1, Math.max(0, subida / SUBIDA_TOPE)) }];
+  }));
 }
 
 // Máximo kg por sesión para un ejercicio: [{fecha, kg}]

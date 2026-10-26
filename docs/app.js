@@ -146,9 +146,11 @@ function radar(nv) {
   return `<svg viewBox="0 0 320 320" width="100%" style="max-width:360px;display:block;margin:auto" role="img" aria-label="Nivel por grupo muscular">
     ${[.25, .5, .75, 1].map(f => `<polygon points="${poly(f)}" fill="none" stroke="#33405f"/>`).join('')}
     ${gs.map((_, i) => `<line x1="${c}" y1="${c}" x2="${pt(i, 1)[0]}" y2="${pt(i, 1)[1]}" stroke="#33405f"/>`).join('')}
-    <polygon points="${poly(i => Math.max(.03, nv[gs[i]]))}" fill="rgba(229,72,77,.35)" stroke="#e5484d" stroke-width="2"/>
-    ${gs.map((g, i) => { const [x, y] = pt(i, 1.3); return `<text x="${x}" y="${y - 6}" text-anchor="middle">${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre.split(' ')[0]}</text><text x="${x}" y="${y + 10}" text-anchor="middle" style="fill:var(--txt);font-weight:600">${Math.round(nv[g] * 100)}%</text>`; }).join('')}
-  </svg>`;
+    <polygon points="${poly(i => Math.max(.03, nv[gs[i]].vol))}" fill="rgba(229,72,77,.3)" stroke="#e5484d" stroke-width="2"/>
+    <polygon points="${poly(i => Math.max(.03, nv[gs[i]].carga))}" fill="rgba(76,141,255,.3)" stroke="#4c8dff" stroke-width="2"/>
+    ${gs.map((g, i) => { const [x, y] = pt(i, 1.3); return `<text x="${x}" y="${y - 6}" text-anchor="middle">${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre.split(' ')[0]}</text><text x="${x}" y="${y + 10}" text-anchor="middle" style="font-weight:600"><tspan style="fill:#e5484d">${Math.round(nv[g].vol * 100)}%</tspan> <tspan style="fill:#4c8dff">+${Math.round(nv[g].subida * 100)}%</tspan></text>`; }).join('')}
+  </svg>
+  <div class="sub" style="text-align:center"><b style="color:#e5484d">■</b> Volumen: series en 4 semanas (24 = 100 %) · <b style="color:#4c8dff">■</b> Carga: subida de kg desde el primer registro (+${L.SUBIDA_TOPE * 100} % llena el eje)</div>`;
 }
 
 function grafico(pts) {

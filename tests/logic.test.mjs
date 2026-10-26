@@ -30,7 +30,10 @@ const lg = Object.fromEntries(L.logros(hist, new Date('2026-10-31T10:00:00')).ma
 assert.ok(lg['🎯'] && lg['🏆'] && lg['🔥'] && lg['🌧️'] && !lg['🔷']);
 
 // Niveles y clima
-assert.ok(L.niveles(hist, new Date('2026-10-31'))['piernas'] > 0);
+const nv = L.niveles(hist, new Date('2026-10-31'));
+assert.ok(nv.piernas.vol > 0 && nv.espalda.vol === 0);
+assert.ok(Math.abs(nv.piernas.subida - (75 / 70 - 1)) < 1e-9); // 70 kg → 75 kg
+assert.ok(Math.abs(nv.piernas.carga - (75 / 70 - 1) / L.SUBIDA_TOPE) < 1e-9 && nv.espalda.carga === 0);
 assert.equal(L.interpretarClima(0).min, 75);
 assert.equal(L.interpretarClima(61).lluvia, true);
 assert.equal(L.interpretarClima(3, 80).txt, 'Lluvia');
