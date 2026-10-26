@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Tatami</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-512.png">
+<style>
+  :root { --bg:#0f1420; --panel:#182032; --panel2:#222c44; --txt:#e8ecf4; --sub:#93a0b8; --ac:#e5484d; --ok:#3fb950; --az:#4c8dff; --r:14px; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:env(safe-area-inset-top) 0 calc(76px + env(safe-area-inset-bottom)); }
+  main { max-width:560px; margin:0 auto; padding:16px; }
+  h1 { font-size:22px; margin:4px 0 14px; } h2 { font-size:17px; margin:0 0 10px; } h3 { font-size:15px; margin:0 0 6px; }
+  .card { background:var(--panel); border-radius:var(--r); padding:14px; margin-bottom:12px; }
+  .sub { color:var(--sub); font-size:14px; }
+  .fila { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .chips button, .grupos button { background:var(--panel2); color:var(--txt); border:2px solid transparent; border-radius:12px; padding:10px 14px; font:inherit; }
+  .chips button.sel, .grupos button.sel { border-color:var(--ac); background:#3a1f28; }
+  .grupos { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .grupos button { text-align:left; padding:12px; }
+  .grupos .tag { display:block; font-size:12px; color:var(--sub); } .grupos .tag.pend { color:#f0b429; }
+  .btn { display:block; width:100%; background:var(--ac); color:#fff; border:0; border-radius:12px; padding:14px; font:600 17px system-ui; margin-top:8px; }
+  .btn.sec { background:var(--panel2); } .btn:disabled { opacity:.4; }
+  .barra { height:10px; background:var(--panel2); border-radius:5px; overflow:hidden; margin:8px 0; } .barra i { display:block; height:100%; background:var(--ok); }
+  .serie { display:grid; grid-template-columns:28px 1fr 1fr auto; gap:6px; align-items:center; margin-top:6px; }
+  .serie input { width:100%; background:var(--panel2); color:var(--txt); border:1px solid #33405f; border-radius:8px; padding:9px 6px; font:inherit; text-align:center; }
+  .serie button, .mini { background:var(--az); color:#fff; border:0; border-radius:10px; padding:10px 12px; font:600 15px system-ui; }
+  .hecho input { opacity:.6; } .hecho button { background:var(--ok); }
+  .bloque { border-left:4px solid var(--az); } .bloque.ok { border-left-color:var(--ok); }
+  ul.lista { margin:6px 0; padding-left:20px; color:var(--sub); }
+  label.switch { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  label.switch input { width:24px; height:24px; accent-color:var(--ac); }
+  nav { position:fixed; bottom:0; left:0; right:0; display:flex; background:#0b0f18; border-top:1px solid #222c44; padding-bottom:env(safe-area-inset-bottom); }
+  nav button { flex:1; background:none; border:0; color:var(--sub); padding:12px; font:600 14px system-ui; } nav button.sel { color:var(--txt); }
+  #timer { position:fixed; inset:0; background:rgba(8,11,18,.94); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:9; }
+  #timer.on { display:flex; } #timer .t { font:700 88px/1 ui-monospace,monospace; margin:12px 0 24px; } #timer .fila button { min-width:76px; }
+  .logro { display:flex; gap:10px; align-items:center; padding:8px 0; opacity:.35; } .logro.ok { opacity:1; } .logro b { font-size:24px; }
+  select { width:100%; background:var(--panel2); color:var(--txt); border:1px solid #33405f; border-radius:8px; padding:10px; font:inherit; }
+  svg text { fill:var(--sub); font:12px system-ui; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div id="timer"><div class="sub" id="timerTxt">Descanso</div><div class="t" id="timerT">0:00</div>
+  <div class="fila"><button class="mini" data-act="t-15">−15 s</button><button class="mini" data-act="t+15">+15 s</button><button class="mini" style="background:var(--ac)" data-act="tfin">Listo</button></div></div>
+<nav><button data-act="tab" data-tab="hoy">🥋 Entrenar</button><button data-act="tab" data-tab="avance">📊 Avance</button></nav>
+<script type="module" src="app.js"></script>
+</body>
+</html>
