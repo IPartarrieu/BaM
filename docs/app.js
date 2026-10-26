@@ -9,13 +9,19 @@ const nombreEj = id => Object.values(L.GRUPOS).flatMap(G => G.ej).concat(L.ABS).
 let db = cargar();
 let tab = db.actual ? 'hoy' : 'inicio';
 let musculo = null;
-let form = { min: null, grupos: [], abs: true };
+let form = { min: null, grupos: [] };
 let clima = null;
 let exSel = null;
 let audio = null, wake = null;
 
 function cargar() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.sesiones)) return { basicos: {}, ...d }; } catch {}
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.sesiones)) {
+    for (const s of d.sesiones) { // versiones previas: abdominales como 'abs' y fuera de los grupos
+      s.series.forEach(x => x.g === 'abs' && (x.g = 'core'));
+      if (s.abs && !s.grupos.includes('core')) s.grupos.push('core');
+    }
+    return { basicos: {}, ...d };
+  } } catch {}
   return { sesiones: [], actual: null, basicos: {} };
 }
 const guardar = () => localStorage.setItem(KEY, JSON.stringify(db));
@@ -38,69 +44,98 @@ async function obtenerClima() {
 const minElegido = () => form.min ?? clima?.min ?? 60;
 const kgTxt = (e, kg) => e.kg === null ? 'peso corporal' : e.kg === 0 ? `lastre ${kg} kg` : `${kg} kg`;
 
-const COLOR = { piernas: '#e5484d', espalda: '#4c8dff', empuje: '#f0b429', brazos: '#3fb950', potencia: '#a371f7', abs: '#ff8c42' };
+const COLOR = { piernas: '#e5484d', espalda: '#4c8dff', empuje: '#f0b429', brazos: '#3fb950', potencia: '#a371f7', core: '#ff8c42' };
 const BASICOS = [['agua', '💧 Llevar la botella de agua'], ['snack', '🍎 Snack saludable'], ['elongar', '🧘 Elongar']];
 const diaHoy = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD local
-const nombreGrupo = g => g === 'abs' ? '🔥 Abdominales con disco (OPCIÓN)' : `${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre}`;
+const nombreGrupo = g => `${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre}`;
 
 function vistaInicio() {
   const b = db.basicos[diaHoy()] || {}, hechos = BASICOS.filter(([k]) => b[k]).length;
   const M = musculo && L.MUSCULOS[musculo];
   const info = !M ? '<div class="sub" style="text-align:center">Toca un músculo para ver su grupo y qué ejercicios lo trabajan.</div>' :
     `<h3 style="color:${COLOR[M[1]]}">${M[0]}</h3><div class="sub">Grupo: ${nombreGrupo(M[1])}</div>
-     <ul class="lista">${L.ejerciciosDe(musculo).map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${e.g === 'abs' ? 'abdominales' : L.GRUPOS[e.g].nombre}</li>`).join('')}</ul>
-     ${M[1] in L.GRUPOS ? `<button class="btn sec" data-act="entrenarGrupo" data-v="${M[1]}">Entrenar ${L.GRUPOS[M[1]].nombre}</button>` : ''}`;
+     <ul class="lista">${L.ejerciciosDe(musculo).map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${L.GRUPOS[e.g].nombre}</li>`).join('')}</ul>
+     ${M ? `<button class="btn sec" data-act="entrenarGrupo" data-v="${M[1]}">Entrenar ${L.GRUPOS[M[1]].nombre}</button>` : ''}`;
   return `<div class="sub" style="letter-spacing:.04em"><b style="color:var(--ac)">BaM</b> · Becoming a Machine</div>
   <h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  ${new Date().getDay() === 1 ? tarjetaLunes() : ''}
   <div class="card"><h2>Básicos de hoy <span class="sub">${hechos}/${BASICOS.length}${hechos === BASICOS.length ? ' · ✓ listo' : ''}</span></h2>
     ${BASICOS.map(([k, t]) => `<label class="switch" style="padding:8px 0"><span>${t}</span><input type="checkbox" data-act="basico" data-v="${k}" ${b[k] ? 'checked' : ''}></label>`).join('')}</div>
   <div class="card"><h2>Mapa muscular</h2>${silueta()}
-    <div class="fila sub" style="justify-content:center;gap:12px;margin:6px 0 10px">${Object.entries(COLOR).filter(([g]) => g !== 'potencia').map(([g, c]) => `<span><b style="color:${c}">●</b> ${g === 'abs' ? 'Abdominales' : L.GRUPOS[g].nombre.split(' ')[0]}</span>`).join('')}</div>
+    <div class="fila sub" style="justify-content:center;gap:12px;margin:6px 0 10px">${Object.entries(COLOR).filter(([g]) => g !== 'potencia').map(([g, c]) => `<span><b style="color:${c}">●</b> ${L.GRUPOS[g].nombre.split(' ')[0]}</span>`).join('')}</div>
     ${info}</div>
   <button class="btn" data-act="tab" data-tab="hoy">🥋 Ir a entrenar</button>`;
 }
 
-// Silueta estilizada frente (x≈100) y espalda (x≈300). Cada músculo es tocable.
+function tarjetaLunes() {
+  const r = L.resumenAnterior(db.sesiones), dif = r.sesiones - r.antes;
+  const stat = (v, t) => `<div><div style="font-size:24px;font-weight:700">${v}</div><div class="sub">${t}</div></div>`;
+  return `<div class="card" style="border:2px solid var(--ac)"><h2>📅 Tu semana pasada</h2>
+    <div class="fila" style="justify-content:space-around;text-align:center">${stat(`${r.sesiones}/${L.META}`, 'sesiones')}${stat(r.minutos, 'minutos')}${stat(r.series, 'series')}</div>
+    <div class="sub" style="margin:8px 0">${dif > 0 ? `▲ ${dif} ${dif > 1 ? 'sesiones' : 'sesión'} más que la semana anterior` : dif < 0 ? `▼ ${-dif} menos que la semana anterior` : 'Igual que la semana anterior'}
+      · Trabajaste: ${[...r.grupos].filter(g => L.GRUPOS[g]).map(g => L.GRUPOS[g].icono).join(' ') || '—'}</div>
+    ${r.ganados.length ? `<div>${r.ganados.map(l => `<span title="${l.t}" style="font-size:22px">${l.i}</span>`).join(' ')} <span class="sub">${r.ganados.length} logro${r.ganados.length > 1 ? 's' : ''}</span></div>` : ''}
+    <p style="margin:10px 0 0;font-weight:600">${r.msg}</p></div>`;
+}
+
+// Silueta anatómica: puntos del lado derecho (x ≥ 100) suavizados con Catmull-Rom y espejados.
+// Frente en x 0–200, espalda desplazada +200.
+const suave = pts => {
+  const n = pts.length, f = p => p.map(v => +v.toFixed(1)).join(',');
+  let d = `M${f(pts[0])}`;
+  for (let i = 0; i < n; i++) {
+    const [p0, p1, p2, p3] = [pts[(i - 1 + n) % n], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]];
+    d += `C${f([p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6])} ${f([p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6])} ${f(p2)}`;
+  }
+  return d + 'Z';
+};
+const espejo = pts => pts.map(([x, y]) => [200 - x, y]);
+const mover = (pts, dx) => pts.map(([x, y]) => [x + dx, y]);
+const CONTORNO_DER = [[108, 46], [109, 60], [124, 66], [140, 72], [152, 82], [156, 100], [157, 124], [160, 148], [165, 170], [165, 196], [163, 214],
+  [166, 232], [161, 248], [154, 244], [153, 228], [153, 212], [150, 184], [147, 160], [146, 140], [143, 118], [138, 110], [134, 128], [130, 150],
+  [128, 166], [134, 184], [138, 204], [138, 232], [132, 262], [128, 278], [132, 300], [128, 322], [121, 342], [126, 354], [118, 358], [108, 356],
+  [108, 342], [106, 318], [106, 296], [105, 276], [104, 244], [102, 218], [100, 210]];
+const CONTORNO = [...CONTORNO_DER, ...espejo(CONTORNO_DER.slice(0, -1).reverse())];
+// [músculo, puntos, ¿central? (no se espeja)]
 const FRENTE = [
-  ['deltoides', 'E', 66, 76, 14, 13], ['deltoides', 'E', 134, 76, 14, 13],
-  ['pectorales', 'P', 'M100,66 L76,68 Q68,84 76,102 Q90,108 100,102 Z'], ['pectorales', 'P', 'M100,66 L124,68 Q132,84 124,102 Q110,108 100,102 Z'],
-  ['oblicuos', 'P', 'M88,108 L78,106 Q72,136 78,166 L88,166 Z'], ['oblicuos', 'P', 'M112,108 L122,106 Q128,136 122,166 L112,166 Z'],
-  ['abdominales', 'P', 'M90,108 L110,108 L111,166 L89,166 Z'],
-  ['biceps', 'E', 58, 108, 9, 19, 10], ['biceps', 'E', 142, 108, 9, 19, -10],
-  ['antebrazos', 'E', 50, 150, 8, 22, 12], ['antebrazos', 'E', 150, 150, 8, 22, -12],
-  ['cuadriceps', 'E', 86, 224, 13, 36], ['cuadriceps', 'E', 114, 224, 13, 36],
-  ['aductores', 'E', 97, 210, 4, 20], ['aductores', 'E', 103, 210, 4, 20],
-  ['gemelos', 'E', 87, 296, 8, 24], ['gemelos', 'E', 113, 296, 8, 24],
+  ['deltoides', [[138, 72], [150, 78], [156, 94], [152, 110], [144, 106], [140, 90]]],
+  ['pectorales', [[101, 74], [120, 72], [138, 80], [142, 94], [134, 110], [116, 116], [101, 112]]],
+  ['biceps', [[144, 110], [152, 114], [156, 130], [154, 146], [148, 148], [145, 132]]],
+  ['antebrazos', [[148, 154], [158, 158], [163, 178], [162, 206], [155, 208], [151, 182]]],
+  ['oblicuos', [[113, 118], [132, 114], [130, 140], [126, 164], [113, 172], [114, 144]]],
+  ['abdominales', [[90, 118], [110, 118], [112, 142], [111, 170], [100, 182], [89, 170], [88, 142]], true],
+  ['cuadriceps', [[106, 214], [118, 198], [132, 200], [136, 226], [132, 260], [118, 272], [109, 262], [107, 240]]],
+  ['aductores', [[101, 212], [110, 206], [111, 228], [106, 250], [102, 236]]],
+  ['gemelos', [[110, 288], [122, 284], [130, 300], [126, 326], [118, 336], [112, 320]]],
 ];
 const ESPALDA = [
-  ['trapecio', 'P', 'M300,48 L280,66 L300,104 L320,66 Z'],
-  ['deltoides_post', 'E', 266, 76, 14, 13], ['deltoides_post', 'E', 334, 76, 14, 13],
-  ['dorsales', 'P', 'M297,104 L280,74 Q268,100 280,140 L297,150 Z'], ['dorsales', 'P', 'M303,104 L320,74 Q332,100 320,140 L303,150 Z'],
-  ['triceps', 'E', 258, 108, 9, 19, 10], ['triceps', 'E', 342, 108, 9, 19, -10],
-  ['antebrazos', 'E', 250, 150, 8, 22, 12], ['antebrazos', 'E', 350, 150, 8, 22, -12],
-  ['lumbares', 'P', 'M288,150 L312,150 L314,170 L286,170 Z'],
-  ['gluteos', 'E', 289, 188, 12, 15], ['gluteos', 'E', 311, 188, 12, 15],
-  ['isquios', 'E', 288, 232, 12, 30], ['isquios', 'E', 312, 232, 12, 30],
-  ['gemelos', 'E', 288, 294, 10, 24], ['gemelos', 'E', 312, 294, 10, 24],
+  ['trapecio', [[100, 56], [110, 60], [134, 72], [118, 84], [108, 110], [100, 124], [92, 110], [82, 84], [66, 72], [90, 60]], true],
+  ['deltoides_post', [[138, 72], [150, 78], [156, 94], [152, 110], [144, 106], [140, 90]]],
+  ['dorsales', [[104, 100], [120, 90], [136, 104], [134, 126], [126, 150], [108, 160], [102, 140]]],
+  ['triceps', [[144, 108], [154, 112], [158, 130], [154, 148], [146, 146], [144, 128]]],
+  ['antebrazos', [[148, 154], [158, 158], [163, 178], [162, 206], [155, 208], [151, 182]]],
+  ['lumbares', [[90, 150], [110, 150], [114, 176], [100, 184], [86, 176]], true],
+  ['gluteos', [[101, 188], [118, 182], [134, 192], [136, 212], [124, 224], [104, 220]]],
+  ['isquios', [[104, 228], [124, 228], [134, 236], [131, 264], [118, 274], [108, 264]]],
+  ['gemelos', [[108, 282], [124, 280], [132, 300], [126, 322], [116, 326], [110, 310]]],
 ];
 function silueta() {
-  const base = x => `<g fill="#2a3550"><ellipse cx="${x}" cy="28" rx="17" ry="21"/><rect x="${x - 8}" y="44" width="16" height="16"/>
-    <path d="M${x - 30},62 Q${x},56 ${x + 30},62 L${x + 28},172 Q${x},182 ${x - 28},172 Z"/><path d="M${x - 26},168 L${x + 26},168 L${x + 22},194 L${x},200 L${x - 22},194 Z"/>
-    <circle cx="${x - 56}" cy="178" r="7"/><circle cx="${x + 56}" cy="178" r="7"/><ellipse cx="${x - 13}" cy="262" rx="9" ry="8"/><ellipse cx="${x + 13}" cy="262" rx="9" ry="8"/>
-    <ellipse cx="${x - 13}" cy="326" rx="9" ry="5"/><ellipse cx="${x + 13}" cy="326" rx="9" ry="5"/></g>`;
-  const forma = ([m, t, ...a]) => {
-    const sel = m === musculo, attrs = `data-act="musculo" data-v="${m}" fill="${COLOR[L.MUSCULOS[m][1]]}" fill-opacity="${sel ? 1 : .5}" stroke="${sel ? '#fff' : '#0f1420'}" stroke-width="${sel ? 2 : 1}" style="cursor:pointer"`;
-    return t === 'P' ? `<path d="${a[0]}" ${attrs}><title>${L.MUSCULOS[m][0]}</title></path>`
-      : `<ellipse cx="${a[0]}" cy="${a[1]}" rx="${a[2]}" ry="${a[3]}" transform="rotate(${a[4] || 0} ${a[0]} ${a[1]})" ${attrs}><title>${L.MUSCULOS[m][0]}</title></ellipse>`;
+  const forma = dx => ([m, pts, central]) => {
+    const sel = m === musculo, c = COLOR[L.MUSCULOS[m][1]];
+    const attrs = `data-act="musculo" data-v="${m}" fill="${c}" fill-opacity="${sel ? .95 : .42}" stroke="${sel ? '#fff' : c}" stroke-opacity="${sel ? 1 : .7}" stroke-width="${sel ? 2 : 1}" style="cursor:pointer"`;
+    return (central ? [pts] : [pts, espejo(pts)]).map(p => `<path d="${suave(mover(p, dx))}" ${attrs}><title>${L.MUSCULOS[m][0]}</title></path>`).join('');
   };
-  return `<svg viewBox="0 0 400 345" width="100%" style="max-width:420px;display:block;margin:auto" role="img" aria-label="Silueta muscular interactiva">
-    ${base(100)}${base(300)}${FRENTE.map(forma).join('')}${ESPALDA.map(forma).join('')}
-    <text x="100" y="343" text-anchor="middle">Frente</text><text x="300" y="343" text-anchor="middle">Espalda</text></svg>`;
+  const cuerpo = dx => `<ellipse cx="${100 + dx}" cy="28" rx="15" ry="20" fill="#26324d" stroke="#3a4a6e"/><path d="${suave(mover(CONTORNO, dx))}" fill="#26324d" stroke="#3a4a6e" stroke-width="1.5"/>`;
+  const detalle = `<g stroke="#0f1420" stroke-opacity=".55" fill="none" pointer-events="none">
+    <path d="M100,118 V178 M91,134 H109 M90,150 H110 M90,164 H110"/><path d="M300,60 V184"/></g>`;
+  return `<svg viewBox="0 0 400 365" width="100%" style="max-width:440px;display:block;margin:auto" role="img" aria-label="Silueta muscular interactiva">
+    ${cuerpo(0)}${cuerpo(200)}${FRENTE.map(forma(0)).join('')}${ESPALDA.map(forma(200)).join('')}${detalle}
+    <text x="100" y="364" text-anchor="middle">Frente</text><text x="300" y="364" text-anchor="middle">Espalda</text></svg>`;
 }
 
 function vistaHoy() {
   const r = L.resumenSemana(db.sesiones), min = minElegido();
-  const plan = form.grupos.length ? L.armarRutina(min, form.grupos, form.abs) : null;
+  const plan = form.grupos.length ? L.armarRutina(min, form.grupos) : null;
   const climaHtml = !clima ? '<span class="sub">Consultando el clima…</span>' : clima.error ? '<span class="sub">Sin datos de clima (sin conexión)</span>' :
     `<div class="fila"><span style="font-size:38px">${clima.i}</span><div><b>${clima.txt}, ${clima.temp} °C</b>
      <div class="sub">Lluvia ${clima.prob}% · ${clima.lluvia ? 'día de lluvia: probablemente haya menos tiempo, prioriza lo esencial' : 'buen día: puede que haya más tiempo para entrenar'}</div></div></div>`;
@@ -112,17 +147,16 @@ function vistaHoy() {
     <div class="fila chips">${[30, 45, 60, 75, 90].map(m => `<button data-act="min" data-v="${m}" class="${m === min ? 'sel' : ''}">${m} min</button>`).join('')}</div>
     ${clima?.min ? `<div class="sub" style="margin-top:6px">Sugerido por el clima: ${clima.min} min</div>` : ''}</div>
   <div class="card"><h2>¿Qué grupo muscular?</h2><div class="grupos">
-    ${Object.entries(L.GRUPOS).map(([g, G]) => `<button data-act="grupo" data-v="${g}" class="${form.grupos.includes(g) ? 'sel' : ''}">${G.icono} ${G.nombre}<span class="tag ${r.grupos.has(g) ? '' : 'pend'}">${r.grupos.has(g) ? '✓ hecho esta semana' : 'pendiente'}</span></button>`).join('')}</div>
-    <label class="switch" style="margin-top:14px"><span>Agregar abdominales con disco <span class="sub">(${Math.round(L.ABS_SEG / 60)} min)</span></span><input type="checkbox" data-act="abs" ${form.abs ? 'checked' : ''}></label></div>
+    ${Object.entries(L.GRUPOS).map(([g, G]) => `<button data-act="grupo" data-v="${g}" class="${form.grupos.includes(g) ? 'sel' : ''}">${G.icono} ${G.nombre}<span class="tag ${r.grupos.has(g) ? '' : 'pend'}">${r.grupos.has(g) ? '✓ hecho esta semana' : 'pendiente'}</span></button>`).join('')}</div></div>
   ${plan ? vistaPlan(plan) : '<div class="sub" style="text-align:center">Elige uno o más grupos para armar la rutina.</div>'}`;
 }
 
 function vistaPlan(plan) {
-  if (!plan.ej.length) return `<div class="card"><h2>Rutina propuesta</h2><div class="sub">No alcanza el tiempo para ejercicios: sube los minutos o quita los abdominales.</div></div>`;
+  if (!plan.ej.length && !plan.conAbs) return `<div class="card"><h2>Rutina propuesta</h2><div class="sub">No alcanza el tiempo para ejercicios: sube los minutos o quita los abdominales.</div></div>`;
   return `<div class="card"><h2>Rutina propuesta</h2><ul class="lista">
     <li>Calentamiento de articulaciones · 5 min</li>
     ${plan.ej.map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · ${kgTxt(e, L.sugerirKg(db.sesiones, e))}</li>`).join('')}
-    ${plan.conAbs ? `<li>Abdominales con disco · ${L.ABS_RONDAS} rondas</li>` : ''}
+    ${plan.conAbs ? `<li><b style="color:var(--txt)">🔥 Core: abdominales con disco</b> · ${L.ABS_RONDAS} rondas fijas · ${Math.round(L.ABS_SEG / 60)} min</li>` : ''}
     <li>Elongar · 5 min</li></ul>
     ${plan.sobraMin >= 5 ? `<div class="sub">Sobran ~${plan.sobraMin} min: úsalos para técnica de BJJ o movilidad.</div>` : ''}
     <button class="btn" data-act="empezar">Empezar</button></div>`;
@@ -176,7 +210,7 @@ function tarjetaAbs() {
       return `<div class="serie ${h ? 'hecho' : ''}"><span></span><span style="grid-column:2/4">${x.n} <span class="sub">× ${x.r}</span></span><button data-act="abs1" data-k="${k}">${h ? '✓' : 'Lista'}</button></div>`;
     }).join('');
   }
-  return `<div class="card bloque"><h3>3 · OPCIÓN · Abdominales con disco</h3>
+  return `<div class="card bloque"><h3>3 · 🔥 Core · abdominales con disco</h3><div class="sub">Rutina fija: solo cambia el peso del disco.</div>
     <div class="fila sub">Disco <input inputmode="decimal" data-k="abskg" value="${esc(a.absKg)}" style="width:70px;background:var(--panel2);color:var(--txt);border:1px solid #33405f;border-radius:8px;padding:6px;text-align:center"> kg · ${L.ABS_DESC_EJ} s entre ejercicios, ${L.ABS_DESC_RONDA} s entre rondas</div>${html}</div>`;
 }
 
@@ -278,15 +312,14 @@ const acciones = {
   tab: el => { tab = el.dataset.tab; render(); scrollTo(0, 0); },
   min: el => { form.min = +el.dataset.v; render(); },
   grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; render(); },
-  abs: el => { form.abs = el.checked; render(); },
   musculo: el => { musculo = musculo === el.dataset.v ? null : el.dataset.v; render(); },
   basico: el => { const d = diaHoy(); db.basicos[d] = { ...db.basicos[d], [el.dataset.v]: el.checked }; guardar(); render(); },
   entrenarGrupo: el => { form.grupos = [el.dataset.v]; tab = 'hoy'; render(); scrollTo(0, 0); },
   empezar: () => {
-    const plan = L.armarRutina(minElegido(), form.grupos, form.abs);
+    const plan = L.armarRutina(minElegido(), form.grupos);
     const ultAbs = [...db.sesiones].reverse().flatMap(s => s.series).find(x => x.ex === L.ABS[0].id);
     db.actual = {
-      inicio: new Date().toISOString(), min: minElegido(), grupos: [...form.grupos], abs: form.abs, absKg: ultAbs?.kg ?? 10,
+      inicio: new Date().toISOString(), min: minElegido(), grupos: [...form.grupos], abs: plan.conAbs, absKg: ultAbs?.kg ?? 10,
       clima: clima && !clima.error ? { txt: clima.txt, lluvia: clima.lluvia } : null,
       ej: plan.ej.map(e => ({ ...e, kgSug: L.sugerirKg(db.sesiones, e) })), hechos: {}, inp: {}, cal: false, elo: false,
     };
@@ -315,7 +348,7 @@ const acciones = {
   terminar: () => {
     const a = db.actual;
     const series = Object.entries(a.hechos).map(([k, h]) => {
-      if (k.startsWith('abs:')) return { ex: L.ABS[+k.split(':')[2]].id, g: 'abs', kg: +String(a.absKg).replace(',', '.') || 0, reps: 20 };
+      if (k.startsWith('abs:')) return { ex: L.ABS[+k.split(':')[2]].id, g: 'core', kg: +String(a.absKg).replace(',', '.') || 0, reps: 20 };
       const e = a.ej.find(x => x.id === k.split(':')[0]);
       return { ex: e.id, g: e.g, kg: e.kg === null ? null : +String(h.kg).replace(',', '.') || 0, reps: +h.reps || 0 };
     });

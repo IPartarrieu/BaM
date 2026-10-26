@@ -2,6 +2,13 @@
 
 // Ejercicios de la rutina de Notion (🥋 Deporte). s=series, r=reps, d=descanso (s),
 // w=trabajo estimado por serie (s), kg=carga inicial (null = peso corporal).
+// Core: rutina fija de abdominales del usuario, 3 rondas con el mismo disco (solo cambia el peso).
+export const ABS = [
+  { id: 'abs_disco', n: 'Abdominal alzando el disco sobre la cabeza', r: '20', m: ['abdominales', 'deltoides'] },
+  { id: 'abs_45', n: 'Piernas 45° y torso 45°: disco de lado a lado', r: '20 por lado', m: ['oblicuos', 'abdominales'] },
+  { id: 'abs_plancha', n: 'Plancha: brazos extendidos ↔ codos', r: '20', m: ['abdominales', 'triceps', 'deltoides'] },
+  { id: 'abs_halo', n: 'Disco alrededor de la cabeza', r: '20 por lado', m: ['deltoides', 'oblicuos', 'abdominales'] },
+];
 export const GRUPOS = {
   piernas: { nombre: 'Piernas y cadera', icono: '🦵', ej: [
     { id: 'pm_hex', n: 'Peso muerto barra hexagonal', s: 4, r: '5', d: 150, kg: 60, m: ['gluteos', 'isquios', 'cuadriceps', 'lumbares', 'trapecio', 'antebrazos'] },
@@ -29,6 +36,7 @@ export const GRUPOS = {
     { id: 'colgarse', n: 'Colgarse del gi o toalla', s: 3, r: 'máx', d: 60, kg: null, w: 45, m: ['antebrazos', 'dorsales'] },
     { id: 'farmer', n: 'Farmer carry 30 m', s: 4, r: '1', d: 60, kg: 24, m: ['antebrazos', 'trapecio', 'abdominales'] },
   ]},
+  core: { nombre: 'Core', icono: '🔥', fija: true, ej: ABS },
   potencia: { nombre: 'Potencia y gas', icono: '⚡', ej: [
     { id: 'swing', n: 'Swing con kettlebell', s: 5, r: '10', d: 60, kg: 16, m: ['gluteos', 'isquios', 'lumbares', 'abdominales'] },
     { id: 'cajon', n: 'Salto al cajón', s: 4, r: '4', d: 90, kg: null, w: 20, m: ['cuadriceps', 'gluteos', 'gemelos'] },
@@ -40,40 +48,33 @@ export const GRUPOS = {
 export const CALENTAMIENTO = ['Círculos de cuello, brazos, cintura y piernas', '90/90 de cadera × 8', 'Estiramiento de espalda', 'Calentamiento de piernas con banda elástica'];
 export const ELONGACION = ['Rana (aductores)', '90/90 sostenido por lado', 'Puente de lucha suave', 'Apertura torácica en el suelo', 'Isquios y psoas por lado'];
 
-// OPCIÓN: rutina de abdominales del usuario, 3 rondas intensas con el mismo disco.
-export const ABS = [
-  { id: 'abs_disco', n: 'Abdominal alzando el disco sobre la cabeza', r: '20', m: ['abdominales', 'deltoides'] },
-  { id: 'abs_45', n: 'Piernas 45° y torso 45°: disco de lado a lado', r: '20 por lado', m: ['oblicuos', 'abdominales'] },
-  { id: 'abs_plancha', n: 'Plancha: brazos extendidos ↔ codos', r: '20', m: ['abdominales', 'triceps', 'deltoides'] },
-  { id: 'abs_halo', n: 'Disco alrededor de la cabeza', r: '20 por lado', m: ['deltoides', 'oblicuos', 'abdominales'] },
-];
-export const ABS_RONDAS = 3, ABS_DESC_EJ = 15, ABS_DESC_RONDA = 90;
+export const ABS_RONDAS = 3, ABS_DESC_EJ = 5, ABS_DESC_RONDA = 90;
 export const ABS_SEG = ABS_RONDAS * (ABS.length * 55 + (ABS.length - 1) * ABS_DESC_EJ) + (ABS_RONDAS - 1) * ABS_DESC_RONDA;
 export const FIJO_SEG = 600; // calentamiento 5 min + elongar 5 min
 export const CAMBIO_SEG = 150; // montar máquina / cambiar discos; calibrado para que 1 h con abdominales dé 3 ejercicios
 
-// Silueta: músculo → nombre y grupo al que pertenece ('abs' = rutina OPCIÓN de abdominales).
+// Silueta: músculo → nombre y grupo al que pertenece.
 export const MUSCULOS = {
   pectorales: ['Pectorales', 'empuje'], deltoides: ['Deltoides (hombros)', 'empuje'], triceps: ['Tríceps', 'empuje'],
   biceps: ['Bíceps', 'brazos'], antebrazos: ['Antebrazos y agarre', 'brazos'],
   trapecio: ['Trapecio', 'espalda'], dorsales: ['Dorsales', 'espalda'], deltoides_post: ['Deltoide posterior', 'espalda'], lumbares: ['Lumbares', 'espalda'],
   gluteos: ['Glúteos', 'piernas'], cuadriceps: ['Cuádriceps', 'piernas'], isquios: ['Isquiotibiales', 'piernas'], aductores: ['Aductores', 'piernas'], gemelos: ['Gemelos', 'piernas'],
-  abdominales: ['Abdominales', 'abs'], oblicuos: ['Oblicuos', 'abs'],
+  abdominales: ['Abdominales', 'core'], oblicuos: ['Oblicuos', 'core'],
 };
 
 // Ejercicios que trabajan un músculo, con su grupo.
 export const ejerciciosDe = musculo => Object.entries(GRUPOS)
   .flatMap(([g, G]) => G.ej.map(e => ({ ...e, g })))
-  .concat(ABS.map(e => ({ ...e, g: 'abs' })))
   .filter(e => e.m.includes(musculo));
 
 const costo = (e, s) => s * ((e.w ?? 40) + e.d) + CAMBIO_SEG;
 
-// Alterna los ejercicios de los grupos elegidos y llena el tiempo disponible.
+// Core es fijo (rondas de ABS); el resto alterna sus ejercicios y llena el tiempo disponible.
 // Si un ejercicio no cabe completo, prueba con menos series (mínimo 2).
-export function armarRutina(minutos, grupos, conAbs) {
+export function armarRutina(minutos, grupos) {
+  const conAbs = grupos.includes('core');
   let libre = minutos * 60 - FIJO_SEG - (conAbs ? ABS_SEG : 0);
-  const listas = grupos.map(g => GRUPOS[g].ej.map(e => ({ ...e, g })));
+  const listas = grupos.filter(g => !GRUPOS[g].fija).map(g => GRUPOS[g].ej.map(e => ({ ...e, g })));
   const orden = [];
   for (let i = 0; listas.some(l => i < l.length); i++) listas.forEach(l => l[i] && orden.push(l[i]));
   const ej = [];
@@ -167,6 +168,16 @@ export function logros(sesiones, fecha = new Date()) {
     { t: '60 series en la semana', ok: r.series >= 60, i: '💪' },
     { t: racha > 1 ? `Racha de ${racha} semanas cumpliendo` : 'Racha: 2 semanas seguidas cumpliendo', ok: racha >= 2, i: '📈' },
   ];
+}
+
+// Resumen de la semana anterior (se muestra los lunes) con un mensaje para seguir.
+export function resumenAnterior(sesiones, fecha = new Date()) {
+  const d = new Date(fecha); d.setDate(d.getDate() - 7);
+  const r = resumenSemana(sesiones, d), p = new Date(d); p.setDate(p.getDate() - 7);
+  const msg = r.sesiones >= META ? `¡Meta cumplida con ${r.sesiones} sesiones! Mantén el ritmo esta semana.`
+    : r.sesiones === 0 ? `Semana sin entrenar. Hoy es buen día para volver: ${META} sesiones y retomas la racha.`
+    : `${r.sesiones} de ${META} sesiones: te faltó ${META - r.sesiones}. Esta semana vas por la meta.`;
+  return { ...r, antes: resumenSemana(sesiones, p).sesiones, ganados: logros(sesiones, d).filter(l => l.ok), msg };
 }
 
 // Códigos WMO de Open-Meteo → etiqueta y minutos sugeridos.
