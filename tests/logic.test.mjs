@@ -3,8 +3,8 @@ import * as L from '../docs/logic.js';
 
 // La rutina respeta el tiempo y crece con él
 const corta = L.armarRutina(30, ['piernas'], false), larga = L.armarRutina(90, ['piernas'], true);
-const seg = r => r.ej.reduce((a, e) => a + e.s * ((e.w ?? 40) + e.d), 0) + L.FIJO_SEG + (r.conAbs ? L.ABS_SEG : 0);
-assert.ok(seg(corta) <= 30 * 60 && corta.ej.length >= 2);
+const seg = r => r.ej.reduce((a, e) => a + e.s * ((e.w ?? 40) + e.d) + L.CAMBIO_SEG, 0) + L.FIJO_SEG + (r.conAbs ? L.ABS_SEG : 0);
+assert.ok(seg(corta) <= 30 * 60 && corta.ej.length >= 1);
 assert.ok(seg(larga) <= 90 * 60 && larga.ej.length === L.GRUPOS.piernas.ej.length);
 assert.equal(L.armarRutina(20, ['piernas'], true).ej.length, 0);
 // Dos grupos se alternan
@@ -25,7 +25,7 @@ const semana = ['2026-10-26T20:00:00', '2026-10-28T20:00:00', '2026-10-30T20:00:
 const hist = [...ses([5, 5, 5, 5]), ...semana];
 const r = L.resumenSemana(hist, new Date('2026-10-31T10:00:00'));
 assert.equal(r.sesiones, 3);
-assert.deepEqual(r.pendientes, ['brazos', 'core', 'potencia']);
+assert.deepEqual(r.pendientes, ['brazos', 'potencia']);
 const lg = Object.fromEntries(L.logros(hist, new Date('2026-10-31T10:00:00')).map(l => [l.i, l.ok]));
 assert.ok(lg['🎯'] && lg['🏆'] && lg['🔥'] && lg['🌧️'] && !lg['🔷']);
 
@@ -37,4 +37,11 @@ assert.ok(Math.abs(nv.piernas.carga - (75 / 70 - 1) / L.SUBIDA_TOPE) < 1e-9 && n
 assert.equal(L.interpretarClima(0).min, 75);
 assert.equal(L.interpretarClima(61).lluvia, true);
 assert.equal(L.interpretarClima(3, 80).txt, 'Lluvia');
+// 1 h con abdominales = 3 ejercicios, en el orden priorizado
+assert.deepEqual(L.armarRutina(60, ['piernas'], true).ej.map(e => e.id), ['pm_hex', 'hack', 'hip_thrust']);
+assert.deepEqual(L.armarRutina(60, ['espalda'], true).ej.map(e => e.id), ['jalon', 'remo_barra', 'face_pull']);
+assert.deepEqual(L.armarRutina(60, ['empuje'], true).ej.map(e => e.id), ['press_incl', 'militar', 'fondos']);
+// Silueta: todo músculo tiene ejercicios y todo músculo citado existe
+for (const m in L.MUSCULOS) assert.ok(L.ejerciciosDe(m).length > 0, m);
+for (const e of Object.values(L.GRUPOS).flatMap(G => G.ej).concat(L.ABS)) for (const m of e.m) assert.ok(m in L.MUSCULOS, m);
 console.log('ok');

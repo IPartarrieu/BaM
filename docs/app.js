@@ -7,15 +7,16 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};
 const nombreEj = id => Object.values(L.GRUPOS).flatMap(G => G.ej).concat(L.ABS).find(e => e.id === id)?.n ?? id;
 
 let db = cargar();
-let tab = 'hoy';
+let tab = db.actual ? 'hoy' : 'inicio';
+let musculo = null;
 let form = { min: null, grupos: [], abs: true };
 let clima = null;
 let exSel = null;
 let audio = null, wake = null;
 
 function cargar() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.sesiones)) return d; } catch {}
-  return { sesiones: [], actual: null };
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.sesiones)) return { basicos: {}, ...d }; } catch {}
+  return { sesiones: [], actual: null, basicos: {} };
 }
 const guardar = () => localStorage.setItem(KEY, JSON.stringify(db));
 
@@ -37,14 +38,73 @@ async function obtenerClima() {
 const minElegido = () => form.min ?? clima?.min ?? 60;
 const kgTxt = (e, kg) => e.kg === null ? 'peso corporal' : e.kg === 0 ? `lastre ${kg} kg` : `${kg} kg`;
 
+const COLOR = { piernas: '#e5484d', espalda: '#4c8dff', empuje: '#f0b429', brazos: '#3fb950', potencia: '#a371f7', abs: '#ff8c42' };
+const BASICOS = [['agua', '💧 Llevar la botella de agua'], ['snack', '🍎 Snack saludable'], ['elongar', '🧘 Elongar']];
+const diaHoy = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD local
+const nombreGrupo = g => g === 'abs' ? '🔥 Abdominales con disco (OPCIÓN)' : `${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre}`;
+
+function vistaInicio() {
+  const b = db.basicos[diaHoy()] || {}, hechos = BASICOS.filter(([k]) => b[k]).length;
+  const M = musculo && L.MUSCULOS[musculo];
+  const info = !M ? '<div class="sub" style="text-align:center">Toca un músculo para ver su grupo y qué ejercicios lo trabajan.</div>' :
+    `<h3 style="color:${COLOR[M[1]]}">${M[0]}</h3><div class="sub">Grupo: ${nombreGrupo(M[1])}</div>
+     <ul class="lista">${L.ejerciciosDe(musculo).map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${e.g === 'abs' ? 'abdominales' : L.GRUPOS[e.g].nombre}</li>`).join('')}</ul>
+     ${M[1] in L.GRUPOS ? `<button class="btn sec" data-act="entrenarGrupo" data-v="${M[1]}">Entrenar ${L.GRUPOS[M[1]].nombre}</button>` : ''}`;
+  return `<div class="sub" style="letter-spacing:.04em"><b style="color:var(--ac)">BaM</b> · Becoming a Machine</div>
+  <h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  <div class="card"><h2>Básicos de hoy <span class="sub">${hechos}/${BASICOS.length}${hechos === BASICOS.length ? ' · ✓ listo' : ''}</span></h2>
+    ${BASICOS.map(([k, t]) => `<label class="switch" style="padding:8px 0"><span>${t}</span><input type="checkbox" data-act="basico" data-v="${k}" ${b[k] ? 'checked' : ''}></label>`).join('')}</div>
+  <div class="card"><h2>Mapa muscular</h2>${silueta()}
+    <div class="fila sub" style="justify-content:center;gap:12px;margin:6px 0 10px">${Object.entries(COLOR).filter(([g]) => g !== 'potencia').map(([g, c]) => `<span><b style="color:${c}">●</b> ${g === 'abs' ? 'Abdominales' : L.GRUPOS[g].nombre.split(' ')[0]}</span>`).join('')}</div>
+    ${info}</div>
+  <button class="btn" data-act="tab" data-tab="hoy">🥋 Ir a entrenar</button>`;
+}
+
+// Silueta estilizada frente (x≈100) y espalda (x≈300). Cada músculo es tocable.
+const FRENTE = [
+  ['deltoides', 'E', 66, 76, 14, 13], ['deltoides', 'E', 134, 76, 14, 13],
+  ['pectorales', 'P', 'M100,66 L76,68 Q68,84 76,102 Q90,108 100,102 Z'], ['pectorales', 'P', 'M100,66 L124,68 Q132,84 124,102 Q110,108 100,102 Z'],
+  ['oblicuos', 'P', 'M88,108 L78,106 Q72,136 78,166 L88,166 Z'], ['oblicuos', 'P', 'M112,108 L122,106 Q128,136 122,166 L112,166 Z'],
+  ['abdominales', 'P', 'M90,108 L110,108 L111,166 L89,166 Z'],
+  ['biceps', 'E', 58, 108, 9, 19, 10], ['biceps', 'E', 142, 108, 9, 19, -10],
+  ['antebrazos', 'E', 50, 150, 8, 22, 12], ['antebrazos', 'E', 150, 150, 8, 22, -12],
+  ['cuadriceps', 'E', 86, 224, 13, 36], ['cuadriceps', 'E', 114, 224, 13, 36],
+  ['aductores', 'E', 97, 210, 4, 20], ['aductores', 'E', 103, 210, 4, 20],
+  ['gemelos', 'E', 87, 296, 8, 24], ['gemelos', 'E', 113, 296, 8, 24],
+];
+const ESPALDA = [
+  ['trapecio', 'P', 'M300,48 L280,66 L300,104 L320,66 Z'],
+  ['deltoides_post', 'E', 266, 76, 14, 13], ['deltoides_post', 'E', 334, 76, 14, 13],
+  ['dorsales', 'P', 'M297,104 L280,74 Q268,100 280,140 L297,150 Z'], ['dorsales', 'P', 'M303,104 L320,74 Q332,100 320,140 L303,150 Z'],
+  ['triceps', 'E', 258, 108, 9, 19, 10], ['triceps', 'E', 342, 108, 9, 19, -10],
+  ['antebrazos', 'E', 250, 150, 8, 22, 12], ['antebrazos', 'E', 350, 150, 8, 22, -12],
+  ['lumbares', 'P', 'M288,150 L312,150 L314,170 L286,170 Z'],
+  ['gluteos', 'E', 289, 188, 12, 15], ['gluteos', 'E', 311, 188, 12, 15],
+  ['isquios', 'E', 288, 232, 12, 30], ['isquios', 'E', 312, 232, 12, 30],
+  ['gemelos', 'E', 288, 294, 10, 24], ['gemelos', 'E', 312, 294, 10, 24],
+];
+function silueta() {
+  const base = x => `<g fill="#2a3550"><ellipse cx="${x}" cy="28" rx="17" ry="21"/><rect x="${x - 8}" y="44" width="16" height="16"/>
+    <path d="M${x - 30},62 Q${x},56 ${x + 30},62 L${x + 28},172 Q${x},182 ${x - 28},172 Z"/><path d="M${x - 26},168 L${x + 26},168 L${x + 22},194 L${x},200 L${x - 22},194 Z"/>
+    <circle cx="${x - 56}" cy="178" r="7"/><circle cx="${x + 56}" cy="178" r="7"/><ellipse cx="${x - 13}" cy="262" rx="9" ry="8"/><ellipse cx="${x + 13}" cy="262" rx="9" ry="8"/>
+    <ellipse cx="${x - 13}" cy="326" rx="9" ry="5"/><ellipse cx="${x + 13}" cy="326" rx="9" ry="5"/></g>`;
+  const forma = ([m, t, ...a]) => {
+    const sel = m === musculo, attrs = `data-act="musculo" data-v="${m}" fill="${COLOR[L.MUSCULOS[m][1]]}" fill-opacity="${sel ? 1 : .5}" stroke="${sel ? '#fff' : '#0f1420'}" stroke-width="${sel ? 2 : 1}" style="cursor:pointer"`;
+    return t === 'P' ? `<path d="${a[0]}" ${attrs}><title>${L.MUSCULOS[m][0]}</title></path>`
+      : `<ellipse cx="${a[0]}" cy="${a[1]}" rx="${a[2]}" ry="${a[3]}" transform="rotate(${a[4] || 0} ${a[0]} ${a[1]})" ${attrs}><title>${L.MUSCULOS[m][0]}</title></ellipse>`;
+  };
+  return `<svg viewBox="0 0 400 345" width="100%" style="max-width:420px;display:block;margin:auto" role="img" aria-label="Silueta muscular interactiva">
+    ${base(100)}${base(300)}${FRENTE.map(forma).join('')}${ESPALDA.map(forma).join('')}
+    <text x="100" y="343" text-anchor="middle">Frente</text><text x="300" y="343" text-anchor="middle">Espalda</text></svg>`;
+}
+
 function vistaHoy() {
   const r = L.resumenSemana(db.sesiones), min = minElegido();
   const plan = form.grupos.length ? L.armarRutina(min, form.grupos, form.abs) : null;
   const climaHtml = !clima ? '<span class="sub">Consultando el clima…</span>' : clima.error ? '<span class="sub">Sin datos de clima (sin conexión)</span>' :
     `<div class="fila"><span style="font-size:38px">${clima.i}</span><div><b>${clima.txt}, ${clima.temp} °C</b>
      <div class="sub">Lluvia ${clima.prob}% · ${clima.lluvia ? 'día de lluvia: probablemente haya menos tiempo, prioriza lo esencial' : 'buen día: puede que haya más tiempo para entrenar'}</div></div></div>`;
-  return `<div class="sub" style="letter-spacing:.04em"><b style="color:var(--ac)">BaM</b> · Becoming a Machine</div>
-  <h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  return `<h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   <div class="card">${climaHtml}</div>
   <div class="card"><h2>Semana: ${r.sesiones}/${L.META} sesiones</h2><div class="barra"><i style="width:${Math.min(100, r.sesiones / L.META * 100)}%"></i></div>
     <div class="sub">${r.pendientes.length ? 'Falta: ' + r.pendientes.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' · ') : '¡Todos los grupos trabajados esta semana!'}</div></div>
@@ -174,7 +234,7 @@ function grafico(pts) {
 
 function render() {
   const enCurso = tab === 'hoy' && db.actual;
-  $('#app').innerHTML = tab === 'avance' ? vistaAvance() : enCurso ? vistaEntreno() : vistaHoy();
+  $('#app').innerHTML = tab === 'inicio' ? vistaInicio() : tab === 'avance' ? vistaAvance() : enCurso ? vistaEntreno() : vistaHoy();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('sel', b.dataset.tab === tab));
 }
 
@@ -219,6 +279,9 @@ const acciones = {
   min: el => { form.min = +el.dataset.v; render(); },
   grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; render(); },
   abs: el => { form.abs = el.checked; render(); },
+  musculo: el => { musculo = musculo === el.dataset.v ? null : el.dataset.v; render(); },
+  basico: el => { const d = diaHoy(); db.basicos[d] = { ...db.basicos[d], [el.dataset.v]: el.checked }; guardar(); render(); },
+  entrenarGrupo: el => { form.grupos = [el.dataset.v]; tab = 'hoy'; render(); scrollTo(0, 0); },
   empezar: () => {
     const plan = L.armarRutina(minElegido(), form.grupos, form.abs);
     const ultAbs = [...db.sesiones].reverse().flatMap(s => s.series).find(x => x.ex === L.ABS[0].id);
@@ -252,7 +315,7 @@ const acciones = {
   terminar: () => {
     const a = db.actual;
     const series = Object.entries(a.hechos).map(([k, h]) => {
-      if (k.startsWith('abs:')) return { ex: L.ABS[+k.split(':')[2]].id, g: 'core', kg: +String(a.absKg).replace(',', '.') || 0, reps: 20 };
+      if (k.startsWith('abs:')) return { ex: L.ABS[+k.split(':')[2]].id, g: 'abs', kg: +String(a.absKg).replace(',', '.') || 0, reps: 20 };
       const e = a.ej.find(x => x.id === k.split(':')[0]);
       return { ex: e.id, g: e.g, kg: e.kg === null ? null : +String(h.kg).replace(',', '.') || 0, reps: +h.reps || 0 };
     });
@@ -298,7 +361,7 @@ document.addEventListener('change', async ev => {
     try {
       const d = JSON.parse(await ev.target.files[0].text());
       if (!Array.isArray(d.sesiones) || !d.sesiones.every(s => s.fecha && Array.isArray(s.series))) throw new Error();
-      if (confirm(`¿Reemplazar ${db.sesiones.length} sesiones por las ${d.sesiones.length} del respaldo?`)) { db = { sesiones: d.sesiones, actual: null }; guardar(); render(); }
+      if (confirm(`¿Reemplazar ${db.sesiones.length} sesiones por las ${d.sesiones.length} del respaldo?`)) { db = { sesiones: d.sesiones, actual: null, basicos: d.basicos || {} }; guardar(); render(); }
     } catch { alert('El archivo no es un respaldo válido de BaM.'); }
   }
 });
@@ -308,5 +371,5 @@ setInterval(() => { const r = $('#reloj'); if (r) r.textContent = transcurrido()
 
 render();
 pantallaEncendida();
-obtenerClima().then(c => { clima = c; }).catch(() => { clima = { error: true }; }).finally(() => tab === 'hoy' && !db.actual && render());
+obtenerClima().then(c => { clima = c; }).catch(() => { clima = { error: true }; }).finally(() => tab !== 'avance' && !db.actual && render());
 navigator.serviceWorker?.register('sw.js');

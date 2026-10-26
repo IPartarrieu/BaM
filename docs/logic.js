@@ -4,60 +4,70 @@
 // w=trabajo estimado por serie (s), kg=carga inicial (null = peso corporal).
 export const GRUPOS = {
   piernas: { nombre: 'Piernas y cadera', icono: '🦵', ej: [
-    { id: 'pm_hex', n: 'Peso muerto barra hexagonal', s: 4, r: '5', d: 150, kg: 60 },
-    { id: 'bulgara', n: 'Sentadilla búlgara', s: 3, r: '8', x: 'por lado', d: 90, kg: 12, w: 60 },
-    { id: 'hip_thrust', n: 'Hip thrust', s: 3, r: '10', d: 90, kg: 60 },
-    { id: 'nordico', n: 'Curl nórdico (o femoral)', s: 3, r: '6', d: 90, kg: null },
-    { id: 'copenhague', n: 'Plancha Copenhague', s: 3, r: '20 s', x: 'por lado', d: 60, kg: null, w: 50 },
+    { id: 'pm_hex', n: 'Peso muerto barra hexagonal', s: 4, r: '5', d: 150, kg: 60, m: ['gluteos', 'isquios', 'cuadriceps', 'lumbares', 'trapecio', 'antebrazos'] },
+    { id: 'hack', n: 'Sentadilla en máquina Hack', s: 3, r: '8', d: 90, kg: 60, m: ['cuadriceps', 'gluteos', 'aductores'] },
+    { id: 'hip_thrust', n: 'Hip thrust', s: 3, r: '10', d: 90, kg: 60, m: ['gluteos', 'isquios'] },
+    { id: 'nordico', n: 'Curl nórdico (o femoral)', s: 3, r: '6', d: 90, kg: null, m: ['isquios', 'gemelos'] },
+    { id: 'copenhague', n: 'Plancha Copenhague', s: 3, r: '20 s', x: 'por lado', d: 60, kg: null, w: 50, m: ['aductores', 'oblicuos'] },
   ]},
   espalda: { nombre: 'Espalda y tracción', icono: '🪢', ej: [
-    { id: 'dom_toalla', n: 'Dominadas con toalla o gi', s: 4, r: '5-8', d: 120, kg: 0 },
-    { id: 'remo_barra', n: 'Remo con barra', s: 4, r: '8', d: 90, kg: 40 },
-    { id: 'remo_uni', n: 'Remo unilateral mancuerna', s: 3, r: '10', x: 'por lado', d: 60, kg: 18, w: 60 },
-    { id: 'face_pull', n: 'Face pull', s: 3, r: '15', d: 60, kg: 15 },
+    { id: 'jalon', n: 'Jalón al pecho', s: 4, r: '8', d: 90, kg: 45, m: ['dorsales', 'biceps', 'deltoides_post'] },
+    { id: 'remo_barra', n: 'Remo con barra', s: 4, r: '8', d: 90, kg: 40, m: ['dorsales', 'trapecio', 'deltoides_post', 'biceps', 'lumbares'] },
+    { id: 'face_pull', n: 'Face pull', s: 3, r: '15', d: 60, kg: 15, m: ['deltoides_post', 'trapecio'] },
+    { id: 'remo_uni', n: 'Remo unilateral mancuerna', s: 3, r: '10', x: 'por lado', d: 60, kg: 18, w: 60, m: ['dorsales', 'biceps', 'antebrazos'] },
   ]},
   empuje: { nombre: 'Pecho y hombros', icono: '🛡️', ej: [
-    { id: 'banca_cerr', n: 'Press banca agarre cerrado', s: 4, r: '6', d: 120, kg: 50 },
-    { id: 'militar', n: 'Press militar de pie', s: 3, r: '8', d: 90, kg: 30 },
-    { id: 'fondos', n: 'Fondos', s: 3, r: '8-12', d: 90, kg: 0 },
-    { id: 'landmine', n: 'Landmine press con rotación', s: 4, r: '5', x: 'por lado', d: 90, kg: 20, w: 50 },
+    { id: 'press_incl', n: 'Press banca inclinado', s: 4, r: '8', d: 120, kg: 40, m: ['pectorales', 'deltoides', 'triceps'] },
+    { id: 'militar', n: 'Press militar de pie', s: 3, r: '8', d: 90, kg: 30, m: ['deltoides', 'triceps', 'trapecio'] },
+    { id: 'fondos', n: 'Fondos', s: 3, r: '8-12', d: 90, kg: 0, m: ['pectorales', 'triceps', 'deltoides'] },
+    { id: 'landmine', n: 'Landmine press con rotación', s: 4, r: '5', x: 'por lado', d: 90, kg: 20, w: 50, m: ['deltoides', 'pectorales', 'oblicuos', 'triceps'] },
   ]},
   brazos: { nombre: 'Brazos y agarre', icono: '✊', ej: [
-    { id: 'colgarse', n: 'Colgarse del gi o toalla', s: 3, r: 'máx', d: 60, kg: null, w: 45 },
-    { id: 'farmer', n: 'Farmer carry 30 m', s: 4, r: '1', d: 60, kg: 24 },
-    { id: 'curl_mart', n: 'Curl martillo', s: 3, r: '12', d: 60, kg: 10 },
-    { id: 'pinch', n: 'Pinch grip con discos', s: 3, r: '30 s', d: 45, kg: 10 },
-  ]},
-  core: { nombre: 'Core y cuello', icono: '🎯', ej: [
-    { id: 'tgu', n: 'Turkish get-up', s: 3, r: '2', x: 'por lado', d: 60, kg: 12, w: 75 },
-    { id: 'pallof', n: 'Pallof press', s: 3, r: '12', x: 'por lado', d: 45, kg: 10, w: 50 },
-    { id: 'rueda', n: 'Rueda abdominal', s: 3, r: '10', d: 60, kg: null },
-    { id: 'cuello', n: 'Isométricos de cuello (4 direcciones)', s: 2, r: '20 s', d: 30, kg: null, w: 90 },
+    { id: 'curl_mart', n: 'Curl martillo', s: 3, r: '12', d: 60, kg: 10, m: ['biceps', 'antebrazos'] },
+    { id: 'curl_rev', n: 'Curl reverso', s: 3, r: '12', d: 60, kg: 15, m: ['antebrazos', 'biceps'] },
+    { id: 'pinch', n: 'Pinch grip con discos', s: 3, r: '30 s', d: 45, kg: 10, m: ['antebrazos'] },
+    { id: 'colgarse', n: 'Colgarse del gi o toalla', s: 3, r: 'máx', d: 60, kg: null, w: 45, m: ['antebrazos', 'dorsales'] },
+    { id: 'farmer', n: 'Farmer carry 30 m', s: 4, r: '1', d: 60, kg: 24, m: ['antebrazos', 'trapecio', 'abdominales'] },
   ]},
   potencia: { nombre: 'Potencia y gas', icono: '⚡', ej: [
-    { id: 'swing', n: 'Swing con kettlebell', s: 5, r: '10', d: 60, kg: 16 },
-    { id: 'cajon', n: 'Salto al cajón', s: 4, r: '4', d: 90, kg: null, w: 20 },
-    { id: 'balon_rot', n: 'Lanzamiento rotacional balón medicinal', s: 3, r: '6', x: 'por lado', d: 60, kg: 4 },
-    { id: 'sprints', n: 'Empuje de trineo o sprints 20 m', s: 6, r: '1', d: 60, kg: null, w: 15 },
-    { id: 'ronda_bjj', n: 'Ronda BJJ: sprawls · bear crawl · burpees (30 s c/u)', s: 4, r: '1', d: 30, kg: null, w: 90 },
+    { id: 'swing', n: 'Swing con kettlebell', s: 5, r: '10', d: 60, kg: 16, m: ['gluteos', 'isquios', 'lumbares', 'abdominales'] },
+    { id: 'cajon', n: 'Salto al cajón', s: 4, r: '4', d: 90, kg: null, w: 20, m: ['cuadriceps', 'gluteos', 'gemelos'] },
+    { id: 'balon_rot', n: 'Lanzamiento rotacional balón medicinal', s: 3, r: '6', x: 'por lado', d: 60, kg: 4, m: ['oblicuos', 'abdominales', 'deltoides'] },
+    { id: 'remo_maq', n: 'Remo en máquina 250 m', s: 4, r: '1', d: 90, kg: null, w: 60, m: ['dorsales', 'cuadriceps', 'gluteos', 'biceps'] },
   ]},
 };
 
-export const CALENTAMIENTO = ['Círculos de cuello, hombros, muñecas y tobillos', '90/90 de cadera × 8', 'Shrimp (escape de cadera) × 10 m', 'Puente sobre hombros × 8', 'Rotaciones torácicas × 8 por lado'];
+export const CALENTAMIENTO = ['Círculos de cuello, brazos, cintura y piernas', '90/90 de cadera × 8', 'Estiramiento de espalda', 'Calentamiento de piernas con banda elástica'];
 export const ELONGACION = ['Rana (aductores)', '90/90 sostenido por lado', 'Puente de lucha suave', 'Apertura torácica en el suelo', 'Isquios y psoas por lado'];
 
 // OPCIÓN: rutina de abdominales del usuario, 3 rondas intensas con el mismo disco.
 export const ABS = [
-  { id: 'abs_disco', n: 'Abdominal alzando el disco sobre la cabeza', r: '20' },
-  { id: 'abs_45', n: 'Piernas 45° y torso 45°: disco de lado a lado', r: '20 por lado' },
-  { id: 'abs_plancha', n: 'Plancha: brazos extendidos ↔ codos', r: '20' },
-  { id: 'abs_halo', n: 'Disco alrededor de la cabeza', r: '20 por lado' },
+  { id: 'abs_disco', n: 'Abdominal alzando el disco sobre la cabeza', r: '20', m: ['abdominales', 'deltoides'] },
+  { id: 'abs_45', n: 'Piernas 45° y torso 45°: disco de lado a lado', r: '20 por lado', m: ['oblicuos', 'abdominales'] },
+  { id: 'abs_plancha', n: 'Plancha: brazos extendidos ↔ codos', r: '20', m: ['abdominales', 'triceps', 'deltoides'] },
+  { id: 'abs_halo', n: 'Disco alrededor de la cabeza', r: '20 por lado', m: ['deltoides', 'oblicuos', 'abdominales'] },
 ];
 export const ABS_RONDAS = 3, ABS_DESC_EJ = 15, ABS_DESC_RONDA = 90;
 export const ABS_SEG = ABS_RONDAS * (ABS.length * 55 + (ABS.length - 1) * ABS_DESC_EJ) + (ABS_RONDAS - 1) * ABS_DESC_RONDA;
 export const FIJO_SEG = 600; // calentamiento 5 min + elongar 5 min
+export const CAMBIO_SEG = 150; // montar máquina / cambiar discos; calibrado para que 1 h con abdominales dé 3 ejercicios
 
-const costo = (e, s) => s * ((e.w ?? 40) + e.d);
+// Silueta: músculo → nombre y grupo al que pertenece ('abs' = rutina OPCIÓN de abdominales).
+export const MUSCULOS = {
+  pectorales: ['Pectorales', 'empuje'], deltoides: ['Deltoides (hombros)', 'empuje'], triceps: ['Tríceps', 'empuje'],
+  biceps: ['Bíceps', 'brazos'], antebrazos: ['Antebrazos y agarre', 'brazos'],
+  trapecio: ['Trapecio', 'espalda'], dorsales: ['Dorsales', 'espalda'], deltoides_post: ['Deltoide posterior', 'espalda'], lumbares: ['Lumbares', 'espalda'],
+  gluteos: ['Glúteos', 'piernas'], cuadriceps: ['Cuádriceps', 'piernas'], isquios: ['Isquiotibiales', 'piernas'], aductores: ['Aductores', 'piernas'], gemelos: ['Gemelos', 'piernas'],
+  abdominales: ['Abdominales', 'abs'], oblicuos: ['Oblicuos', 'abs'],
+};
+
+// Ejercicios que trabajan un músculo, con su grupo.
+export const ejerciciosDe = musculo => Object.entries(GRUPOS)
+  .flatMap(([g, G]) => G.ej.map(e => ({ ...e, g })))
+  .concat(ABS.map(e => ({ ...e, g: 'abs' })))
+  .filter(e => e.m.includes(musculo));
+
+const costo = (e, s) => s * ((e.w ?? 40) + e.d) + CAMBIO_SEG;
 
 // Alterna los ejercicios de los grupos elegidos y llena el tiempo disponible.
 // Si un ejercicio no cabe completo, prueba con menos series (mínimo 2).
@@ -150,7 +160,7 @@ export function logros(sesiones, fecha = new Date()) {
   for (let d = new Date(fecha); resumenSemana(sesiones, d).sesiones >= META; d.setDate(d.getDate() - 7)) racha++;
   return [
     { t: `Meta semanal: ${META} sesiones`, ok: r.sesiones >= META, i: '🎯' },
-    { t: 'Los 6 grupos en la semana', ok: r.pendientes.length === 0, i: '🔷' },
+    { t: `Los ${Object.keys(GRUPOS).length} grupos en la semana`, ok: r.pendientes.length === 0, i: '🔷' },
     { t: 'Récord personal de carga', ok: record, i: '🏆' },
     { t: 'Abdominales 2 veces', ok: r.lista.filter(s => s.abs).length >= 2, i: '🔥' },
     { t: 'Entrenaste un día de lluvia', ok: r.lista.some(s => s.clima?.lluvia), i: '🌧️' },
