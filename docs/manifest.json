@@ -1,3 +1,3 @@
-{ "name": "Tatami · entrenamiento BJJ", "short_name": "Tatami", "start_url": "./", "display": "standalone",
+{ "name": "BaM · Becoming a Machine", "short_name": "BaM", "start_url": "./", "display": "standalone",
   "background_color": "#0f1420", "theme_color": "#0f1420", "lang": "es",
   "icons": [ { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" }, { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" } ] }

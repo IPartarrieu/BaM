@@ -1,6 +1,6 @@
 import * as L from './logic.js';
 
-const KEY = 'tatami-v1';
+const KEY = 'bam-v1';
 const COORD_DEF = [-36.83, -73.05]; // Concepción, si no hay GPS
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
@@ -22,14 +22,14 @@ const guardar = () => localStorage.setItem(KEY, JSON.stringify(db));
 // ---------- clima (Open-Meteo, sin clave; se guarda una vez por día) ----------
 async function obtenerClima() {
   const dia = new Date().toDateString();
-  try { const c = JSON.parse(localStorage.getItem('tatami-clima')); if (c?.dia === dia) return c; } catch {}
+  try { const c = JSON.parse(localStorage.getItem('bam-clima')); if (c?.dia === dia) return c; } catch {}
   const [la, lo] = await new Promise(r => navigator.geolocation
     ? navigator.geolocation.getCurrentPosition(p => r([p.coords.latitude, p.coords.longitude]), () => r(COORD_DEF), { timeout: 6000, maximumAge: 36e5 })
     : r(COORD_DEF));
   const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la.toFixed(2)}&longitude=${lo.toFixed(2)}&current=temperature_2m&daily=weather_code,precipitation_probability_max&timezone=auto&forecast_days=1`)).json();
   const prob = j.daily.precipitation_probability_max[0] ?? 0;
   const c = { dia, temp: Math.round(j.current.temperature_2m), prob, ...L.interpretarClima(j.daily.weather_code[0], prob) };
-  localStorage.setItem('tatami-clima', JSON.stringify(c));
+  localStorage.setItem('bam-clima', JSON.stringify(c));
   return c;
 }
 
@@ -43,7 +43,8 @@ function vistaHoy() {
   const climaHtml = !clima ? '<span class="sub">Consultando el clima…</span>' : clima.error ? '<span class="sub">Sin datos de clima (sin conexión)</span>' :
     `<div class="fila"><span style="font-size:38px">${clima.i}</span><div><b>${clima.txt}, ${clima.temp} °C</b>
      <div class="sub">Lluvia ${clima.prob}% · ${clima.lluvia ? 'día de lluvia: probablemente haya menos tiempo, prioriza lo esencial' : 'buen día: puede que haya más tiempo para entrenar'}</div></div></div>`;
-  return `<h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  return `<div class="sub" style="letter-spacing:.04em"><b style="color:var(--ac)">BaM</b> · Becoming a Machine</div>
+  <h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   <div class="card">${climaHtml}</div>
   <div class="card"><h2>Semana: ${r.sesiones}/${L.META} sesiones</h2><div class="barra"><i style="width:${Math.min(100, r.sesiones / L.META * 100)}%"></i></div>
     <div class="sub">${r.pendientes.length ? 'Falta: ' + r.pendientes.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' · ') : '¡Todos los grupos trabajados esta semana!'}</div></div>
@@ -269,7 +270,7 @@ const acciones = {
   tfin: () => { clearInterval(tInt); $('#timer').classList.remove('on'); },
   exportar: () => {
     const u = URL.createObjectURL(new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' }));
-    const l = Object.assign(document.createElement('a'), { href: u, download: `tatami-${new Date().toISOString().slice(0, 10)}.json` });
+    const l = Object.assign(document.createElement('a'), { href: u, download: `bam-${new Date().toISOString().slice(0, 10)}.json` });
     l.click(); setTimeout(() => URL.revokeObjectURL(u), 1000);
   },
 };
@@ -298,7 +299,7 @@ document.addEventListener('change', async ev => {
       const d = JSON.parse(await ev.target.files[0].text());
       if (!Array.isArray(d.sesiones) || !d.sesiones.every(s => s.fecha && Array.isArray(s.series))) throw new Error();
       if (confirm(`¿Reemplazar ${db.sesiones.length} sesiones por las ${d.sesiones.length} del respaldo?`)) { db = { sesiones: d.sesiones, actual: null }; guardar(); render(); }
-    } catch { alert('El archivo no es un respaldo válido de Tatami.'); }
+    } catch { alert('El archivo no es un respaldo válido de BaM.'); }
   }
 });
 
