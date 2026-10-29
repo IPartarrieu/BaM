@@ -26,6 +26,19 @@ Reglas de carga:
 - **Entrenamiento concurrente.** La fuerza y el cardio intenso van en días distintos o separados por ≥ 6 h. Los intervalos no se ponen el día anterior a un día de fuerza de piernas pesada cuando se puede evitar.
 - **Otros deportes cuentan.** Un partido de fútbol es trabajo intermitente de alta intensidad. Si en la semana hay partido, se reemplaza una sesión de intervalos o rounds por Z2, y ese día solo se hace movilidad.
 
+### Metas de la semana: fijas y variables
+
+No hay horario fijo. Cada semana tiene metas según la fase:
+
+| Fase | Fijas ⭐ (no se negocian) | Variables (si el día da) |
+|---|---|---|
+| Base | Fuerza A, Fuerza B, Z2 | Z2, movilidad |
+| Construcción | Fuerza A, Fuerza B, intervalos | Z2, movilidad |
+| Específica | Fuerza A, Fuerza B, rounds | Z2, rounds |
+| Descarga | Fuerza A, rounds | Z2, movilidad |
+
+La app reparte lo pendiente en los días que quedan. Pone primero las fijas y después las variables, sin dos sesiones duras seguidas si se puede evitar. Usa los huecos libres del Google Calendar: todo evento es fijo salvo el bloque "Ejercicio", que la app puede mover. Cada sesión hecha descuenta su meta aunque se haga otro día, así el plan se reacomoda solo. El día anterior (o el mismo día) eliges la sesión, la hora y los minutos, y la app mueve el bloque en el calendario.
+
 ### Sesiones del plan
 
 - **Fuerza A**: piernas + espalda + core. **Fuerza B**: pecho/hombros + brazos y agarre + core (en Base) o potencia (desde Construcción). Usa la misma rutina por grupos de la app, con las series multiplicadas por el factor de la fase.

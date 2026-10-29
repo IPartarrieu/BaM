@@ -9,11 +9,13 @@ const nombreEj = id => Object.values(L.GRUPOS).flatMap(G => G.ej).concat(L.ABS).
 let db = cargar();
 let tab = db.actual ? 'hoy' : 'inicio';
 let musculo = null;
-let form = { min: null, grupos: [], factor: 1, plan: null };
+let form = { min: null, grupos: [], factor: 1, plan: null, item: null };
 let clima = null;
 let exSel = null;
 let audio = null, wake = null;
 let calMsg = '';
+let editando = null; // fecha del editor abierto en Inicio/Plan
+const edit = {}; // cambios sin confirmar por fecha: { item, hora, min }
 
 function cargar() {
   try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.sesiones)) {
@@ -26,7 +28,7 @@ function cargar() {
   return { sesiones: [], actual: null, ...defaults() };
 }
 function defaults() {
-  return { basicos: {}, perfil: {}, meta: null, agenda: {}, agendaLeida: null, actividad: [], horario: { porSemana: 4, dias: [1, 2, 3, 4], hora: '19:30', min: 75 } };
+  return { basicos: {}, perfil: {}, meta: null, actividad: [], cal: { leido: null, ev: [] }, dias: {} };
 }
 const guardar = () => localStorage.setItem(KEY, JSON.stringify(db));
 
@@ -52,19 +54,27 @@ const COLOR = { piernas: '#e5484d', espalda: '#4c8dff', empuje: '#f0b429', brazo
 const diaHoy = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD local
 const fechaTxt = (f, o) => L.dia(f).toLocaleDateString('es-CL', o);
 
-function semanaPlan(fecha = new Date()) {
+function semana(fecha = new Date()) {
   if (!db.meta) return null;
   const est = L.estadoMeta(db.meta, fecha);
-  if (est.fin) return { est, dias: [] };
-  const l = L.lunes(fecha), h = db.horario, desde = l < db.meta.inicio ? db.meta.inicio : l;
-  const slots = db.agenda[l] ?? L.slotsManuales(l, h.dias, h.hora, h.min, desde);
-  return { est, l, dias: L.planSemana(est.fase, slots).filter(d => d.fecha <= db.meta.fecha) };
+  if (est.fin) return { est, dias: [], items: [], pend: [], sinLugar: [] };
+  const l = L.lunes(fecha), hoy = diaHoy(), fin = L.sumarDias(l, 6) < db.meta.fecha ? L.sumarDias(l, 6) : db.meta.fecha;
+  const ev = db.cal.ev, deporteSemana = ev.some(e => L.lunes(e.ini) === l && L.RE_DEPORTE.test(e.t || '')) ||
+    db.actividad.some(a => L.lunes(a.fecha) === l && /fútbol|bjj/i.test(a.tipo));
+  const items = L.metasSemana(est.fase, deporteSemana);
+  const hechas = db.sesiones.filter(s => L.lunes(s.fecha) === l);
+  const pend = L.pendientes(items, hechas);
+  const fechas = []; for (let f = hoy > l ? hoy : l; f <= fin; f = L.sumarDias(f, 1)) fechas.push(f);
+  const dias = fechas.map(f => ({ fecha: f, d: L.dispDia(ev, f, { ahora: new Date() }), elegido: db.dias[f], hecho: db.sesiones.some(x => L.iso(x.fecha) === f) }));
+  const r = L.distribuir(est.fase, pend, dias, L.horaHabitual(ev));
+  return { est, l, items, hechas, pend, dias: r.dias, sinLugar: r.sinLugar };
 }
-const hechaPlan = f => db.sesiones.some(s => L.iso(s.fecha) === f);
+const semanaDe = f => semana(L.lunes(f) === L.lunes(new Date()) ? new Date() : L.dia(f));
+const diaPlan = f => semanaDe(f)?.dias.find(d => d.fecha === f);
 const nombreGrupo = g => `${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre}`;
 
 function tarjetaMeta() {
-  const m = db.meta, est = m && semanaPlan().est;
+  const m = db.meta, est = m && semana().est;
   if (!m) return `<div class="card"><h2>🎯 Tu meta</h2><div class="sub">Define una fecha y te armo el plan semana a semana.</div><button class="btn" data-act="tab" data-tab="plan">Crear mi plan</button></div>`;
   if (est.fin) return `<div class="card" style="border:2px solid var(--ac)"><h2>¡Llegó el día! Inscríbete en las clases de BJJ 🥋</h2><button class="btn" data-act="tab" data-tab="plan">Crear una meta nueva</button></div>`;
   return `<div class="card"><h2>🎯 ${esc(m.nombre)} · faltan ${est.dias} días</h2>
@@ -72,13 +82,56 @@ function tarjetaMeta() {
     <div class="barra"><i style="width:${(est.semana + 1) / est.total * 100}%"></i></div><div class="sub">${L.FASES[est.fase].obj}</div></div>`;
 }
 
-function tarjetaHoy(hp) {
-  if (!db.meta) return '';
-  const ses = hp?.ses, hecha = hp && hechaPlan(hp.fecha);
-  const dep = hp?.deporte ? `<div class="sub">⚽ ${esc(hp.deporte)}: cuenta como entrenamiento intenso</div>` : '';
-  if (ses) return `<div class="card"><h2>Hoy</h2><div>${ses.i} ${ses.n} · ${hp.hora} · ${L.minSesion(ses)} min${hecha ? ' · ✓ hecha' : ''}</div>${dep}
-    <button class="btn" data-act="planEmpezar">Empezar</button></div>`;
-  return `<div class="card"><h2>Hoy</h2>${dep}<div class="sub">Día libre: camina o haz movilidad 20 min</div></div>`;
+function tarjetaHoy(hoy) {
+  const d = db.meta && diaPlan(hoy);
+  if (!d) return '';
+  if (editando === hoy) return editorDia(hoy);
+  const ses = d.ses, dep = d.deporte ? `<div class="sub">⚽ ${esc(d.deporte)}: cuenta como entrenamiento intenso</div>` : '';
+  if (d.hecho) return `<div class="card"><h2>Hoy</h2><div>✓ Ya entrenaste hoy</div>${dep}</div>`;
+  const cambiar = `<button class="btn sec" data-act="editar" data-v="${hoy}">Cambiar</button>`;
+  if (ses) return `<div class="card"><h2>Hoy</h2><div>${ses.i} ${ses.n} · ${d.hora} · ${d.min} min</div><div class="sub">${d.item.fija ? '⭐ fija' : 'variable'}</div>${dep}
+    <button class="btn" data-act="planEmpezar">Empezar</button>${cambiar}</div>`;
+  return `<div class="card"><h2>Hoy</h2>${dep}<div class="sub">Día libre: camina o haz movilidad 20 min</div>${cambiar}</div>`;
+}
+
+function tarjetaManana() {
+  const m = L.sumarDias(diaHoy(), 1), d = db.meta && diaPlan(m);
+  if (!d) return '';
+  if (db.dias[m] && editando !== m) return `<div class="card"><h2>Mañana · ${fechaTxt(m, { weekday: 'long' })}</h2>
+    <div>Confirmado: ${d.ses ? `${d.ses.i} ${d.ses.n} a las ${d.hora} · ${d.min} min` : 'día libre'}</div>
+    <button class="btn sec" data-act="editar" data-v="${m}">Cambiar</button></div>`;
+  return editorDia(m);
+}
+
+// Datos del editor de un día: lo propuesto por distribuir, salvo lo que el usuario cambió.
+function valoresEd(f) {
+  const s = semanaDe(f), d = s?.dias.find(x => x.fecha === f), e = edit[f] || {};
+  return { s, d, item: e.item ?? d?.item?.id ?? 'libre', hora: e.hora || d?.hora || L.horaHabitual(db.cal.ev), min: e.min ?? d?.min ?? 60 };
+}
+
+function editorDia(f) {
+  const c = valoresEd(f), d = c.d;
+  if (!d) return '';
+  const hoy = diaHoy(), fase = c.s.est.fase, hh = L.hhmm;
+  const disp = L.dispDia(db.cal.ev, f, { ahora: new Date() });
+  const titulo = f === hoy ? 'Hoy' : `${f === L.sumarDias(hoy, 1) ? 'Mañana · ' : ''}${fechaTxt(f, { weekday: 'long', ...(f === L.sumarDias(hoy, 1) ? {} : { day: 'numeric' }) })}`;
+  const ops = c.s.pend.map(it => { const x = L.sesion(it.tipo, fase); return `<option value="${it.id}" ${c.item === it.id ? 'selected' : ''}>${it.fija ? '⭐ ' : ''}${x.i} ${x.n}</option>`; }).join('');
+  const ini = L.aMs(f, c.hora), fin = ini + c.min * 6e4;
+  const choca = c.item !== 'libre' && db.cal.ev.find(e => !L.esBloque(e.t || '') && L.iso(e.ini) === f && +L.dia(e.ini) < fin && +L.dia(e.fin) > ini);
+  const amarillo = t => `<div style="margin-top:6px;color:#f0b429">${t}</div>`;
+  return `<div class="card" style="border:2px solid var(--ac)"><h2>${titulo}</h2>
+    <select id="edItem${f}" data-edit="item" data-f="${f}"><option value="libre" ${c.item === 'libre' ? 'selected' : ''}>Día libre</option>${ops}</select>
+    <input class="campo" type="time" id="edHora${f}" data-edit="hora" data-f="${f}" value="${c.hora}" aria-label="hora" style="margin-top:6px">
+    <div class="sub" style="margin-top:6px">Huecos libres</div>
+    <div class="fila chips">${disp.huecos.map(([x, y]) => `<button data-act="edHueco" data-f="${f}" data-v="${hh(x)}">${hh(x)}–${hh(y)}</button>`).join('') || '<span class="sub">Sin huecos</span>'}</div>
+    ${disp.deporte ? `<div class="sub">⚽ ${esc(disp.deporte)}: ese día solo movilidad</div>` : ''}
+    ${disp.choque ? amarillo(`Tu bloque de Ejercicio choca con '${esc(disp.choque)}'`) : ''}
+    <div class="sub" style="margin-top:6px">Minutos</div>
+    <div class="fila chips">${[30, 45, 60, 75, 90].map(n => `<button data-act="edMin" data-f="${f}" data-v="${n}" class="${n === c.min ? 'sel' : ''}">${n}</button>`).join('')}</div>
+    ${choca ? amarillo(`Esa hora choca con '${esc(choca.t)}'`) : ''}
+    ${calMsg ? amarillo(esc(calMsg)) : ''}
+    <button class="btn" data-act="confirmarDia" data-v="${f}">Confirmar${db.calUrl ? ' y mover en el calendario' : ''}</button>
+    ${db.dias[f] ? `<button class="mini" style="background:var(--panel2);margin-top:6px" data-act="soltarDia" data-v="${f}">Volver a la propuesta</button>` : ''}</div>`;
 }
 
 const tipoDiaDe = hp => hp?.deporte && !hp?.ses ? 'deporte' : hp?.ses?.tipo ?? 'descanso';
@@ -86,7 +139,7 @@ const nutDe = hp => L.nutricion(db.perfil.peso, tipoDiaDe(hp), hp?.ses ? L.minSe
 const ACTIVIDADES = ['Caminata', 'Trote', 'Bici', 'Fútbol', 'Clase de BJJ', 'Movilidad', 'Otra'];
 
 function vistaInicio() {
-  const hp = semanaPlan()?.dias.find(d => d.fecha === diaHoy()), nut = nutDe(hp), hoy = diaHoy();
+  const hoy = diaHoy(), hp = diaPlan(hoy), nut = nutDe(hp);
   const b = db.basicos[hoy] || {}, racha = L.racha(db.basicos, hoy);
   const metas = [
     ['mov', hp?.ses ? `🏃 ${hp.ses.n}` : '🚶 Caminar o movilidad 20 min'],
@@ -106,7 +159,7 @@ function vistaInicio() {
   return `<div class="sub" style="letter-spacing:.04em"><b style="color:var(--ac)">BaM</b> · Becoming a Machine</div>
   <h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   ${new Date().getDay() === 1 ? tarjetaLunes() : ''}
-  ${tarjetaMeta()}${tarjetaHoy(hp)}
+  ${tarjetaMeta()}${tarjetaHoy(hoy)}${tarjetaManana()}
   <div class="card"><h2>Metas de hoy <span class="sub">🔥 ${racha.actual} días</span></h2>
     <div class="sub">mejor racha ${racha.mejor} · cuenta si te mueves y cumples 4 de 6</div>
     ${metas.map(([k, t]) => `<label class="switch" style="padding:8px 0"><span>${t}</span><input type="checkbox" data-act="basico" data-v="${k}" ${b[k] ? 'checked' : ''}></label>`).join('')}
@@ -193,8 +246,8 @@ function silueta() {
 function vistaHoy() {
   const r = L.resumenSemana(db.sesiones), min = minElegido();
   const plan = form.grupos.length ? L.armarRutina(min, form.grupos, form.factor ?? 1) : null;
-  const hp = semanaPlan()?.dias.find(d => d.fecha === diaHoy());
-  const delPlan = hp?.ses && !hechaPlan(hp.fecha) ? `<div class="card" style="border:2px solid var(--ac)"><h2>Sesión del plan</h2><div>${hp.ses.i} ${hp.ses.n} · ${L.minSesion(hp.ses)} min</div><button class="btn" data-act="planEmpezar">Empezar</button></div>` : '';
+  const hp = diaPlan(diaHoy());
+  const delPlan = hp?.ses && !hp.hecho ? `<div class="card" style="border:2px solid var(--ac)"><h2>Sesión del plan</h2><div>${hp.ses.i} ${hp.ses.n} · ${hp.min} min</div><button class="btn" data-act="planEmpezar">Empezar</button></div>` : '';
   const climaHtml = !clima ? '<span class="sub">Consultando el clima…</span>' : clima.error ? '<span class="sub">Sin datos de clima (sin conexión)</span>' :
     `<div class="fila"><span style="font-size:38px">${clima.i}</span><div><b>${clima.txt}, ${clima.temp} °C</b>
      <div class="sub">Lluvia ${clima.prob}% · ${clima.lluvia ? 'día de lluvia: probablemente haya menos tiempo, prioriza lo esencial' : 'buen día: puede que haya más tiempo para entrenar'}</div></div></div>`;
@@ -259,13 +312,12 @@ function vistaCardio() {
 
 const chip = (act, v, txt, sel) => `<button data-act="${act}" data-v="${v}" class="${sel ? 'sel' : ''}">${txt}</button>`;
 function vistaMeta() {
-  const m = db.meta, h = db.horario, p = db.perfil, sp = semanaPlan(), zs = L.zonas(p);
+  const m = db.meta, p = db.perfil, sp = semana(), zs = L.zonas(p);
   const campo = (c, t, ph = '') => `<label class="sub" style="display:block;margin-top:6px">${t}<input class="campo" inputmode="numeric" data-perfil="${c}" value="${esc(p[c] ?? '')}" placeholder="${ph}"></label>`;
   const linea = !m ? '' : Array.from({ length: L.estadoMeta(m, m.fecha).total }, (_, s) => {
     const act = sp && !sp.est.fin && sp.est.semana === s;
     return `<div class="sub" style="padding:4px 8px;border-left:3px solid ${act ? 'var(--ac)' : 'transparent'};${act ? 'color:var(--txt);font-weight:700' : ''}">Sem ${s + 1} · ${fechaTxt(L.sumarDias(L.lunes(m.inicio), s * 7), { day: 'numeric', month: 'short' })} · ${L.FASES[L.faseDe(s, L.estadoMeta(m, m.fecha).total)].n}</div>`;
   }).join('');
-  const leida = db.agenda[L.lunes(new Date())];
   return `<h1>🎯 Plan</h1>
   <div class="card"><h2>🎯 Tu meta</h2>
     <input class="campo" id="mNombre" value="${esc(m?.nombre ?? 'Volver a BJJ')}" aria-label="nombre de la meta">
@@ -276,28 +328,30 @@ function vistaMeta() {
     ${zs ? `<table style="width:100%;margin-top:10px;font-size:14px;border-collapse:collapse">${zs.map(z => `<tr><td>Z${z.z}</td><td>${z.n}</td><td>${z.de}–${z.a} lpm</td><td class="sub">${z.t}</td></tr>`).join('')}</table>`
       : '<div class="sub" style="margin-top:8px">Con edad y FC en reposo calculo tus zonas (Karvonen).</div>'}
     <div class="sub" style="margin-top:8px">FC en reposo: mídela al despertar, acostado, 3 días seguidos.</div></div>
-  <div class="card"><h2>Horario</h2>
-    <div class="sub">Sesiones por semana</div><div class="fila chips">${[3, 4, 5].map(n => chip('porSemana', n, n, h.porSemana === n)).join('')}</div>
-    <div class="sub" style="margin-top:8px">Días</div><div class="fila chips">${[...'LMXJVSD'].map((d, i) => chip('diaSem', i + 1, d, h.dias.includes(i + 1))).join('')}</div>
-    <div class="sub" style="margin-top:8px">Hora</div><input class="campo" type="time" id="hHora" value="${h.hora}" aria-label="hora">
-    <div class="sub" style="margin-top:8px">Minutos</div><div class="fila chips">${[45, 60, 75, 90].map(n => chip('minSes', n, n, h.min === n)).join('')}</div>
-    <input class="campo" id="calUrl" type="url" placeholder="Enlace del Apps Script (…/exec?token=…)" value="${esc(db.calUrl ?? '')}" aria-label="enlace del calendario" style="margin-top:10px">
+  <div class="card"><h2>Google Calendar</h2>
+    <input class="campo" id="calUrl" type="url" placeholder="Enlace del Apps Script (…/exec?token=…)" value="${esc(db.calUrl ?? '')}" aria-label="enlace del calendario">
     <button class="btn sec" data-act="calendario">📅 Leer mi Google Calendar</button>
-    <div class="sub" style="margin-top:6px">Toma los bloques 'Ejercicio' de tu calendario; si algo se cruza, acorta la sesión. El fútbol cuenta como carga. Si faltan días, busca huecos libres entre 9:00 y 21:00.</div>
+    <div class="sub" style="margin-top:6px">Todo evento de tu calendario es fijo salvo el bloque 'Ejercicio': la app lo mueve al confirmar cada día.</div>
     ${calMsg ? `<div style="margin-top:8px;color:#f0b429">${esc(calMsg)}</div>` : ''}
-    ${leida ? `<div class="sub" style="margin-top:8px">Leído del calendario: ${fechaTxt(db.agendaLeida, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div><button class="mini" style="background:var(--panel2)" data-act="horarioFijo">Usar horario fijo</button>` : ''}</div>
-  ${m ? cardSemana(sp) : ''}`;
+    ${db.cal.leido ? `<div class="sub" style="margin-top:8px">Leído: ${fechaTxt(db.cal.leido, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>` : ''}</div>
+  ${m ? cardMetas(sp) + cardDias(sp) : ''}`;
 }
 
-function cardSemana(sp) {
+function cardMetas(sp) {
   if (sp.est.fin) return '';
-  const hechos = sp.dias.filter(d => d.ses && hechaPlan(d.fecha));
-  const z2 = sp.dias.filter(d => d.ses?.tipo === 'z2'), z2h = z2.filter(d => hechaPlan(d.fecha));
-  const min = ds => ds.reduce((n, d) => n + L.minSesion(d.ses), 0);
+  const quedan = new Set(sp.pend.map(x => x.id)), cuenta = fija => { const l = sp.items.filter(x => x.fija === fija); return `${l.filter(x => !quedan.has(x.id)).length}/${l.length}`; };
+  const nom = it => { const x = L.sesion(it.tipo, sp.est.fase); return `${x.i} ${x.n}`; };
+  return `<div class="card"><h2>Metas de la semana</h2>
+    <div class="sub">Fijas ${cuenta(true)} · Variables ${cuenta(false)}</div>
+    ${sp.items.map(it => `<div style="padding:3px 0">${quedan.has(it.id) ? '○' : '✓'} ${it.fija ? '⭐ ' : ''}${nom(it)}</div>`).join('')}
+    ${sp.sinLugar.length ? `<div class="sub" style="margin-top:6px;color:#f0b429">Sin espacio esta semana: ${sp.sinLugar.map(nom).join(', ')}</div>` : ''}</div>`;
+}
+
+function cardDias(sp) {
+  if (sp.est.fin) return '';
   const prox = L.estadoMeta(db.meta, L.sumarDias(sp.l, 7)), nuevaFase = !prox.fin && prox.fase !== sp.est.fase;
-  return `<div class="card"><h2>Esta semana</h2>
-    <div class="sub">${hechos.length}/${sp.dias.filter(d => d.ses).length} sesiones · Z2 ${min(z2h)}/${min(z2)} min · ${hechos.filter(d => d.ses.dura).length} intensas</div>
-    ${sp.dias.map(d => `<div style="padding:5px 0;border-bottom:1px solid var(--panel2)">${fechaTxt(d.fecha, { weekday: 'short', day: 'numeric' })} · ${d.hora ?? '—'} · ${d.ses ? `${d.ses.i} ${d.ses.n} · ${L.minSesion(d.ses)} min` : 'libre'}${hechaPlan(d.fecha) ? ' ✓' : ''}${d.deporte ? ` <span class="sub">⚽ ${esc(d.deporte)}</span>` : ''}</div>`).join('')}
+  const fila = d => `<div ${d.hecho ? '' : `data-act="editar" data-v="${d.fecha}"`} style="padding:5px 0;border-bottom:1px solid var(--panel2);${d.hecho ? '' : 'cursor:pointer'}">${fechaTxt(d.fecha, { weekday: 'short', day: 'numeric' })} · ${d.hecho ? '✓ hecho' : d.ses ? `${d.hora} · ${d.ses.i} ${d.ses.n} · ${d.min} min` : 'libre'}${d.mover ? ' <span class="sub">⇄ mueve el bloque</span>' : ''}${d.elegido ? ' 📌' : ''}${d.deporte ? ` <span class="sub">⚽ ${esc(d.deporte)}</span>` : ''}</div>${editando === d.fecha ? editorDia(d.fecha) : ''}`;
+  return `<div class="card"><h2>Días que quedan</h2>${sp.dias.map(fila).join('') || '<div class="sub">No quedan días esta semana.</div>'}
     ${nuevaFase ? `<div class="sub" style="margin-top:8px">Próxima semana: Fase ${L.FASES[prox.fase].n}</div>` : ''}</div>`;
 }
 
@@ -442,22 +496,40 @@ async function leerCalendario(silencioso = false) {
   if (!db.calUrl) { calMsg = 'Pega primero el enlace de tu Apps Script (ver apps-script/Calendario.gs).'; render(); return; }
   try {
     if (!silencioso) { calMsg = 'Leyendo el calendario…'; render(); }
-    const l = L.lunes(new Date()), l2 = L.sumarDias(l, 7), u = new URL(db.calUrl);
+    const l = L.lunes(new Date()), u = new URL(db.calUrl);
     u.searchParams.set('desde', new Date(l + 'T00:00').toISOString());
     u.searchParams.set('hasta', new Date(L.sumarDias(l, 14) + 'T00:00').toISOString());
     const j = await (await fetch(u)).json();
     if (j.error) throw new Error(j.error === 'token' ? 'el token no coincide con el del script.' : j.error);
-    const hoy = diaHoy(), desde = db.meta?.inicio > hoy ? db.meta.inicio : hoy;
-    for (const x of [l, l2]) db.agenda[x] = L.slotsDeEventos(j.ev, x, { dias: db.horario.porSemana, min: db.horario.min, desde });
-    db.agendaLeida = new Date().toISOString(); calMsg = ''; guardar();
+    db.cal = { leido: new Date().toISOString(), ev: j.ev }; calMsg = ''; guardar();
   } catch (e) { calMsg = `No se pudo leer el calendario: ${e.message}`; }
   render();
 }
 
+// Mueve (o crea) el bloque 'Ejercicio' de un día; actualiza db.cal.ev sin releer todo el calendario.
+async function moverBloque(f, hora, min) {
+  calMsg = 'Moviendo el bloque…'; render();
+  try {
+    const ini = new Date(L.aMs(f, hora)), fin = new Date(+ini + min * 6e4), u = new URL(db.calUrl);
+    u.searchParams.set('accion', 'mover');
+    u.searchParams.set('desde', new Date(f + 'T00:00').toISOString());
+    u.searchParams.set('hasta', new Date(L.sumarDias(f, 1) + 'T00:00').toISOString());
+    u.searchParams.set('ini', ini.toISOString());
+    u.searchParams.set('fin', fin.toISOString());
+    const j = await (await fetch(u)).json();
+    if (j.error) throw new Error(j.error === 'token' ? 'el token no coincide con el del script.' : j.error);
+    const b = db.cal.ev.find(e => L.esBloque(e.t || '') && L.iso(e.ini) === f);
+    if (b) Object.assign(b, { ini: ini.toISOString(), fin: fin.toISOString() });
+    else db.cal.ev.push({ t: 'Ejercicio', ini: ini.toISOString(), fin: fin.toISOString() });
+    calMsg = b ? `Bloque movido a ${hora}` : `Bloque creado a las ${hora}`;
+  } catch (e) { calMsg = `No se pudo mover el bloque: ${e.message}`; }
+  guardar(); render();
+}
+
 const acciones = {
   tab: el => { tab = el.dataset.tab; render(); scrollTo(0, 0); },
-  min: el => { form.min = +el.dataset.v; form.factor = 1; form.plan = null; render(); },
-  grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; form.factor = 1; form.plan = null; render(); },
+  min: el => { form.min = +el.dataset.v; form.factor = 1; form.plan = null; form.item = null; render(); },
+  grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; form.factor = 1; form.plan = null; form.item = null; render(); },
   musculo: el => { musculo = musculo === el.dataset.v ? null : el.dataset.v; render(); },
   basico: el => { const d = diaHoy(); db.basicos[d] = { ...db.basicos[d], [el.dataset.v]: el.checked }; guardar(); render(); },
   entrenarGrupo: el => { form.grupos = [el.dataset.v]; tab = 'hoy'; render(); scrollTo(0, 0); },
@@ -466,18 +538,18 @@ const acciones = {
     const ultAbs = [...db.sesiones].reverse().flatMap(s => s.series).find(x => x.ex === L.ABS[0].id);
     db.actual = {
       inicio: new Date().toISOString(), min: minElegido(), grupos: [...form.grupos], abs: plan.conAbs, absKg: ultAbs?.kg ?? 10,
-      plan: form.plan, factor: form.factor ?? 1,
+      plan: form.plan, item: form.item, factor: form.factor ?? 1,
       clima: clima && !clima.error ? { txt: clima.txt, lluvia: clima.lluvia } : null,
       ej: plan.ej.map(e => ({ ...e, kgSug: L.sugerirKg(db.sesiones, e) })), hechos: {}, inp: {}, cal: false, elo: false,
     };
     guardar(); pantallaEncendida(); render(); scrollTo(0, 0);
   },
   planEmpezar: () => {
-    const hp = semanaPlan()?.dias.find(d => d.fecha === diaHoy()), ses = hp?.ses;
+    const d = diaPlan(diaHoy()), ses = d?.ses;
     if (!ses) return;
     tab = 'hoy';
-    if (ses.tipo === 'fuerza') { form = { min: ses.min, grupos: [...ses.grupos], factor: ses.factor, plan: hp.fecha }; render(); $('#rutina')?.scrollIntoView(); return; }
-    db.actual = { tipo: ses.tipo, ses, inicio: new Date().toISOString(), plan: hp.fecha, paso: -1 };
+    if (ses.tipo === 'fuerza') { form = { min: ses.min, grupos: [...ses.grupos], factor: ses.factor, plan: d.fecha, item: d.item.id }; render(); $('#rutina')?.scrollIntoView(); return; }
+    db.actual = { tipo: ses.tipo, ses, inicio: new Date().toISOString(), plan: d.fecha, item: d.item.id, paso: -1 };
     guardar(); pantallaEncendida(); render(); scrollTo(0, 0);
   },
   actividad: () => {
@@ -500,7 +572,7 @@ const acciones = {
   terminarCardio: () => {
     const a = db.actual, v = id => $(id).value;
     db.sesiones.push({ fecha: a.inicio, tipo: a.tipo, n: a.ses.n, grupos: [], series: [], abs: false, min: L.minSesion(a.ses),
-      duracionMin: +v('#cMin') || L.minSesion(a.ses), fcProm: +v('#cFc') || null, rpe: +v('#cRpe'), plan: a.plan });
+      duracionMin: +v('#cMin') || L.minSesion(a.ses), fcProm: +v('#cFc') || null, rpe: +v('#cRpe'), plan: a.plan, item: a.item });
     db.basicos[diaHoy()] = { ...db.basicos[diaHoy()], mov: true };
     db.actual = null; tab = 'avance';
     wake?.release(); guardar(); render(); scrollTo(0, 0);
@@ -512,14 +584,17 @@ const acciones = {
     guardar(); render();
   },
   borrarMeta: () => { if (confirm('¿Borrar la meta y su plan?')) { db.meta = null; guardar(); render(); } },
-  porSemana: el => { db.horario.porSemana = +el.dataset.v; guardar(); render(); },
-  minSes: el => { db.horario.min = +el.dataset.v; guardar(); render(); },
-  diaSem: el => {
-    const d = +el.dataset.v, h = db.horario;
-    h.dias = (h.dias.includes(d) ? h.dias.filter(x => x !== d) : [...h.dias, d]).sort((a, b) => a - b);
-    guardar(); render();
+  editar: el => { const f = el.dataset.v; editando = editando === f ? null : f; delete edit[f]; calMsg = ''; render(); },
+  edHueco: el => { const f = el.dataset.f; edit[f] = { ...edit[f], hora: el.dataset.v }; render(); },
+  edMin: el => { const f = el.dataset.f; edit[f] = { ...edit[f], min: +el.dataset.v }; render(); },
+  soltarDia: el => { const f = el.dataset.v; delete db.dias[f]; delete edit[f]; guardar(); render(); },
+  confirmarDia: el => {
+    const f = el.dataset.v, c = valoresEd(f), it = $('#edItem' + f)?.value, hr = $('#edHora' + f)?.value;
+    db.dias[f] = { item: it || c.item, hora: hr || c.hora, min: c.min };
+    delete edit[f]; if (editando === f) editando = null; calMsg = '';
+    guardar();
+    if (db.dias[f].item !== 'libre' && db.calUrl) moverBloque(f, db.dias[f].hora, db.dias[f].min); else render();
   },
-  horarioFijo: () => { const l = L.lunes(new Date()); delete db.agenda[l]; delete db.agenda[L.sumarDias(l, 7)]; guardar(); render(); },
   calendario: () => leerCalendario(),
   fijo: el => { db.actual[el.dataset.v] = true; guardar(); render(); timer(300, el.dataset.v === 'cal' ? 'Calentamiento de articulaciones' : 'Elongar'); },
   serie: el => {
@@ -550,11 +625,11 @@ const acciones = {
     });
     if (!series.length && !confirm('No marcaste ninguna serie. ¿Guardar igual?')) return;
     db.sesiones.push({
-      fecha: a.inicio, tipo: 'fuerza', plan: a.plan, factor: a.factor, grupos: a.grupos, min: a.min, duracionMin: Math.round((Date.now() - new Date(a.inicio)) / 60000),
+      fecha: a.inicio, tipo: 'fuerza', plan: a.plan, item: a.item, factor: a.factor, grupos: a.grupos, min: a.min, duracionMin: Math.round((Date.now() - new Date(a.inicio)) / 60000),
       abs: Object.keys(a.hechos).some(k => k.startsWith('abs:')), clima: a.clima, series,
     });
     db.basicos[diaHoy()] = { ...db.basicos[diaHoy()], mov: true };
-    db.actual = null; form = { min: null, grupos: [], factor: 1, plan: null }; tab = 'avance';
+    db.actual = null; form = { min: null, grupos: [], factor: 1, plan: null, item: null }; tab = 'avance';
     wake?.release(); guardar(); render(); scrollTo(0, 0);
   },
   cancelar: () => { if (confirm('¿Descartar la sesión en curso? Se pierden las series marcadas.')) { db.actual = null; wake?.release(); guardar(); render(); } },
@@ -580,7 +655,6 @@ document.addEventListener('input', ev => {
   const c = ev.target.dataset.perfil;
   if (c) { db.perfil[c] = +String(ev.target.value).replace(',', '.') || null; guardar(); return; }
   if (ev.target.id === 'calUrl') { db.calUrl = ev.target.value.trim() || null; guardar(); return; }
-  if (ev.target.id === 'hHora') { db.horario.hora = ev.target.value || db.horario.hora; guardar(); return; }
   const { k, f } = ev.target.dataset;
   if (!k || !db.actual) return;
   if (k === 'abskg') db.actual.absKg = ev.target.value;
@@ -590,7 +664,8 @@ document.addEventListener('input', ev => {
 
 document.addEventListener('change', async ev => {
   const act = ev.target.dataset.act;
-  if (ev.target.dataset.perfil || ev.target.id === 'hHora') render();
+  if (ev.target.dataset.perfil) render();
+  if (ev.target.dataset.edit) { const f = ev.target.dataset.f; edit[f] = { ...edit[f], [ev.target.dataset.edit]: ev.target.value }; render(); }
   if (act === 'exsel') { exSel = ev.target.value; render(); }
   if (act === 'importar' && ev.target.files[0]) {
     try {
@@ -607,5 +682,5 @@ setInterval(() => { const r = $('#reloj'); if (r) r.textContent = transcurrido()
 render();
 pantallaEncendida();
 obtenerClima().then(c => { clima = c; }).catch(() => { clima = { error: true }; }).finally(() => tab !== 'avance' && !db.actual && render());
-if (db.calUrl && !db.actual && Date.now() - new Date(db.agendaLeida || 0) > 6 * 36e5) leerCalendario(true);
+if (db.calUrl && !db.actual && Date.now() - new Date(db.cal.leido || 0) > 6 * 36e5) leerCalendario(true);
 navigator.serviceWorker?.register('sw.js');

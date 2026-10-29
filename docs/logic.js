@@ -215,16 +215,16 @@ export const ROUND = ['Sprawl × 5', 'Escape de cadera ida y vuelta', 'Swing ket
 export const FASES = {
   base: { n: 'Base', factor: .75, B: ['empuje', 'brazos', 'core'], z2: 35,
     obj: 'Adaptar tendones y articulaciones y construir la base aeróbica. Fuerza con 2–3 repeticiones en reserva (RPE 6–7); cardio en Z2.',
-    sem: ['fuerzaA', 'z2', 'fuerzaB', 'movilidad', 'z2'] },
+    fijas: ['fuerzaA', 'fuerzaB', 'z2'], variables: ['z2', 'movilidad'] },
   construccion: { n: 'Construcción', factor: 1, B: ['empuje', 'brazos', 'potencia'], z2: 40,
     obj: 'Subir la carga (RPE 7–8) y sumar intervalos en Z4 para la potencia aeróbica.',
-    sem: ['fuerzaA', 'intervalos', 'fuerzaB', 'z2', 'movilidad'] },
+    fijas: ['fuerzaA', 'fuerzaB', 'intervalos'], variables: ['z2', 'movilidad'] },
   especifica: { n: 'Específica BJJ', factor: .85, B: ['empuje', 'brazos', 'potencia'], z2: 40, rounds: 6,
     obj: 'Simular la lucha: rounds de 5 min de trabajo continuo en Z4–Z5 con 1 min de pausa. La fuerza se mantiene.',
-    sem: ['fuerzaA', 'rounds', 'fuerzaB', 'z2', 'rounds'] },
+    fijas: ['fuerzaA', 'fuerzaB', 'rounds'], variables: ['z2', 'rounds'] },
   descarga: { n: 'Descarga', factor: .6, B: ['empuje', 'brazos', 'potencia'], z2: 30, rounds: 3,
     obj: 'Bajar el volumen ~40 % y mantener la intensidad para llegar descansado a la meta.',
-    sem: ['fuerzaA', 'rounds', 'z2', 'movilidad', 'movilidad'] },
+    fijas: ['fuerzaA', 'rounds'], variables: ['z2', 'movilidad'] },
 };
 
 // Fase de la semana s (0 = la del inicio) en un plan de `total` semanas; la última es descarga si hay ≥ 3.
@@ -271,51 +271,90 @@ export function sesion(tipo, fase, min = 60) {
 // Duración real de cualquier sesión del plan.
 export const minSesion = x => x.bloques ? Math.round(segBloques(x.bloques) / 60) : x.min;
 
-// Huecos del día: días con dia/hora/min disponibles y si hay deporte (fútbol, partido…).
-export const RE_ENTRENO = /ejercicio|entren|gym|gimnasio/i, RE_SUAVE = /suave|elong/i, RE_DEPORTE = /f[uú]tbol|partido|pichanga|bjj|jiu|p[aá]del|tenis/i;
-const hhmm = ms => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
-const masLargo = (ini, fin, ocup) => { // hueco libre más largo dentro de [ini, fin]
-  let mejor = [ini, ini], t = ini;
-  for (const [a, b] of [...ocup.filter(([a, b]) => b > ini && a < fin).sort((x, y) => x[0] - y[0]), [fin, fin]]) {
-    if (Math.min(a, fin) - t > mejor[1] - mejor[0]) mejor = [t, Math.min(a, fin)];
-    t = Math.max(t, b);
+// ---------- Metas de la semana: fijas (no se negocian) y variables (si el día da) ----------
+// Con deporte en la semana (fútbol, partido…), la sesión intensa fija pasa a Z2 variable: el partido ya es trabajo intermitente.
+export function metasSemana(fase, hayDeporte = false) {
+  const F = FASES[fase], lista = [...F.fijas.map(t => [t, true]), ...F.variables.map(t => [t, false])], n = {};
+  const k = lista.findIndex(([t, f]) => f && (t === 'intervalos' || t === 'rounds'));
+  if (hayDeporte && k >= 0) lista[k] = ['z2', false];
+  return lista.map(([tipo, fija]) => { n[tipo] = (n[tipo] || 0) + 1; return { id: n[tipo] > 1 ? tipo + n[tipo] : tipo, tipo, fija }; });
+}
+const cat = t => t.startsWith('fuerza') ? 'fuerza' : t;
+// Lo que falta: cada sesión hecha descuenta su meta (por id si salió del plan; si no, por tipo).
+export function pendientes(items, hechas) {
+  const quedan = [...items];
+  for (const s of hechas) {
+    let i = quedan.findIndex(x => x.id === s.item);
+    if (i < 0) i = quedan.findIndex(x => cat(x.tipo) === (s.tipo || 'fuerza'));
+    if (i >= 0) quedan.splice(i, 1);
   }
-  return mejor;
+  return quedan;
+}
+
+// ---------- Calendario: el bloque "Ejercicio" se mueve; todo lo demás es fijo ----------
+export const RE_ENTRENO = /ejercicio|entren|gym|gimnasio/i, RE_SUAVE = /suave|elong/i, RE_DEPORTE = /f[uú]tbol|partido|pichanga|bjj|jiu|p[aá]del|tenis/i;
+export const esBloque = t => RE_ENTRENO.test(t) && !RE_SUAVE.test(t);
+export const hhmm = ms => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+export const aMs = (f, hora) => +dia(`${f}T${hora}`);
+// Disponibilidad de un día: bloque de entreno (si hay), huecos libres ≥ 30 min entre `de` y `a` horas
+// sin contar el bloque, deporte del día y el evento fijo que choca con el bloque. Hoy parte desde `ahora`.
+export function dispDia(eventos, f, { de = 7, a = 22, ahora = null } = {}) {
+  const ev = eventos.map(e => ({ t: e.t || '', ini: +dia(e.ini), fin: +dia(e.fin) })).filter(e => iso(e.ini) === f);
+  const bloque = ev.find(e => esBloque(e.t)) || null, fijos = ev.filter(e => !esBloque(e.t));
+  let t = aMs(f, '00:00') + de * 36e5;
+  const fin = aMs(f, '00:00') + a * 36e5, huecos = [];
+  if (ahora && iso(ahora) === f) t = Math.max(t, Math.ceil((+ahora + 15 * 6e4) / 9e5) * 9e5);
+  for (const [x, y] of [...fijos.map(e => [e.ini, e.fin]).sort((p, q) => p[0] - q[0]), [fin, fin]]) {
+    if (Math.min(x, fin) - t >= 30 * 6e4) huecos.push([t, Math.min(x, fin)]);
+    t = Math.max(t, y);
+  }
+  return { bloque, huecos, deporte: ev.find(e => RE_DEPORTE.test(e.t))?.t,
+    choque: bloque ? fijos.find(e => e.ini < bloque.fin && e.fin > bloque.ini)?.t : undefined };
+}
+// Dónde va una sesión de `need` min: en el bloque si cabe libre; si no, en el hueco más cercano a `pref` (ms).
+export function ubicar(d, need, pref) {
+  const b = d.bloque;
+  if (b && (b.fin - b.ini) / 6e4 >= need && d.huecos.some(([x, y]) => x <= b.ini && b.fin <= y)) return { ini: b.ini, min: Math.round((b.fin - b.ini) / 6e4), mover: false };
+  let mejor = null;
+  for (const [x, y] of d.huecos) {
+    if (y - x < need * 6e4) continue;
+    const s = Math.min(Math.max(pref, x), y - need * 6e4);
+    if (!mejor || Math.abs(s - pref) < Math.abs(mejor - pref)) mejor = s;
+  }
+  return mejor === null ? null : { ini: mejor, min: need, mover: true };
+}
+// Hora habitual: la del bloque de entreno más repetido en el calendario (19:30 si no hay ninguno).
+export const horaHabitual = eventos => {
+  const c = {}; for (const e of eventos.filter(e => esBloque(e.t || ''))) { const h = hhmm(+dia(e.ini)); c[h] = (c[h] || 0) + 1; }
+  return Object.keys(c).sort((a, b) => c[b] - c[a])[0] ?? '19:30';
 };
-// eventos: [{t, ini, fin}] (sin los de día completo). Lee la semana del lunes `l` desde `desde`.
-// 1º usa los bloques "Ejercicio" del calendario (recortados si algo se cruza); si faltan días,
-// busca huecos de `min` minutos entre `de` y `a` horas en los días sin bloque.
-export function slotsDeEventos(eventos, l, { dias = 4, min = 75, desde = l, de = 9, a = 21 } = {}) {
-  const ev = eventos.map(e => ({ t: e.t || '', ini: +dia(e.ini), fin: +dia(e.fin) }));
-  const out = [];
-  for (let i = 0; i < 7; i++) {
-    const f = sumarDias(l, i);
-    if (f < desde) continue;
-    const delDia = ev.filter(e => iso(e.ini) === f);
-    const deporte = delDia.find(e => RE_DEPORTE.test(e.t))?.t;
-    const bloque = delDia.filter(e => RE_ENTRENO.test(e.t) && !RE_SUAVE.test(e.t)).sort((x, y) => (y.fin - y.ini) - (x.fin - x.ini))[0];
-    const ocup = delDia.filter(e => e !== bloque).map(e => [e.ini, e.fin]);
-    if (bloque) {
-      const [x, y] = masLargo(bloque.ini, bloque.fin, ocup), m = Math.round((y - x) / 6e4);
-      out.push({ fecha: f, deporte, cal: true, ...(m >= 30 ? { hora: hhmm(x), min: m } : {}) });
-    } else {
-      const base = +dia(f + 'T00:00'), [x, y] = masLargo(base + de * 36e5, base + a * 36e5, ocup);
-      out.push({ fecha: f, deporte, ...((y - x) / 6e4 >= min ? { hora: hhmm(x), min, extra: true } : {}) });
+const minimo = (tipo, fase) => tipo.startsWith('fuerza') ? 60 : minSesion(sesion(tipo, fase));
+
+// Reparte lo pendiente en los días que quedan. dias: [{fecha, d: dispDia, elegido?: {item, hora, min}, hecho?}].
+// Primero lo que el usuario fijó para el día; luego las fijas y después las variables, en el primer día donde quepan,
+// sin dos sesiones duras seguidas si hay alternativa. Los días de deporte solo reciben movilidad.
+export function distribuir(fase, pend, dias, pref = '19:30') {
+  const quedan = [...pend].sort((a, b) => b.fija - a.fija);
+  const out = dias.map(x => ({ fecha: x.fecha, deporte: x.d.deporte, choque: x.d.choque, bloque: !!x.d.bloque, hecho: !!x.hecho }));
+  const poner = (i, it, u, elegido = false) => Object.assign(out[i], { item: it, ses: sesion(it.tipo, fase, u.min), hora: hhmm(u.ini), min: u.min,
+    mover: elegido ? !(x => x && hhmm(x.ini) === hhmm(u.ini) && Math.round((x.fin - x.ini) / 6e4) === u.min)(dias[i].d.bloque) : u.mover, elegido });
+  dias.forEach((x, i) => {
+    if (!x.elegido || x.hecho) return;
+    const k = quedan.findIndex(p => p.id === x.elegido.item);
+    if (k >= 0) poner(i, quedan.splice(k, 1)[0], { ini: aMs(x.fecha, x.elegido.hora), min: +x.elegido.min }, true);
+    else out[i].libre = true; // el usuario dejó el día libre
+  });
+  const dura = i => !!out[i]?.ses?.dura;
+  for (const it of [...quedan]) {
+    const need = minimo(it.tipo, fase);
+    const opciones = out.map((o, i) => i).filter(i => !out[i].item && !out[i].hecho && !out[i].libre && (!out[i].deporte || it.tipo === 'movilidad'));
+    const sinSeguidas = opciones.filter(i => !sesion(it.tipo, fase).dura || (!dura(i - 1) && !dura(i + 1)));
+    for (const i of [...sinSeguidas, ...opciones]) {
+      const u = ubicar(dias[i].d, need, aMs(dias[i].fecha, pref));
+      if (u) { poner(i, it, u); quedan.splice(quedan.indexOf(it), 1); break; }
     }
   }
-  const usar = new Set(out.filter(s => s.hora && !s.deporte).sort((x, y) => !!x.extra - !!y.extra || (x.fecha < y.fecha ? -1 : 1)).slice(0, dias).map(s => s.fecha));
-  return out.filter(s => usar.has(s.fecha) || s.deporte).map(s => usar.has(s.fecha) ? s : { fecha: s.fecha, deporte: s.deporte, ...(s.hora && { hora: s.hora, min: Math.min(s.min, 30) }) });
-}
-// Sin calendario: días de la semana elegidos (1 = lunes … 7 = domingo) a una hora fija.
-export const slotsManuales = (l, diasSem, hora, min, desde = l) =>
-  diasSem.map(d => ({ fecha: sumarDias(l, d - 1), hora, min })).filter(s => s.fecha >= desde).sort((a, b) => a.fecha < b.fecha ? -1 : 1);
-
-// Asigna las sesiones de la fase a los días disponibles. Con deporte en la semana, una sesión de
-// intervalos o rounds pasa a Z2 (el partido ya es trabajo intermitente) y ese día solo va movilidad.
-export function planSemana(fase, slots) {
-  const cola = [...FASES[fase].sem], i = cola.findIndex(t => t === 'intervalos' || t === 'rounds');
-  if (slots.some(s => s.deporte) && i >= 0) cola[i] = 'z2';
-  return slots.map(s => ({ ...s, ses: !s.hora ? null : s.deporte ? sesion('movilidad', fase) : sesion(cola.shift() ?? 'movilidad', fase, s.min) }));
+  return { dias: out, sinLugar: quedan };
 }
 
 // Nutrición del día por kg de peso (ISSN, ACSM): proteína 1,8 g/kg; carbohidrato según la carga; agua 35 ml/kg + 0,6 L/h.

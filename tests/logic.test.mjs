@@ -85,16 +85,33 @@ for (const f of ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29']) {
 ev.push({ t: 'Feña: Viaje a Stgo.', ini: '2026-10-29T19:00', fin: '2026-10-29T20:00' }, { t: 'Fútbol', ini: '2026-10-29T21:00', fin: '2026-10-29T22:15' },
   { t: 'Bloque de trabajo', ini: '2026-10-30T08:15', fin: '2026-10-30T14:00' }, { t: 'Scout', ini: '2026-10-31T15:00', fin: '2026-10-31T18:00' },
   { t: 'Paseadora', ini: '2026-10-27T19:15', fin: '2026-10-27T20:00' }, { t: 'Bruno', ini: '2026-10-27T20:00', fin: '2026-10-27T21:00' });
-const sl = L.slotsDeEventos(ev, '2026-10-26', { desde: '2026-10-29' });
-assert.deepEqual(sl.map(s => [s.fecha.slice(8), s.hora, s.min, !!s.deporte]),
-  [['29', '20:00', 30, true], ['30', '14:00', 75, false], ['31', '09:00', 75, false], ['01', '09:00', 75, false]]);
-const semanaCompleta = L.slotsDeEventos(ev, '2026-10-26');
-assert.equal(semanaCompleta.find(s => s.fecha === '2026-10-27'), undefined); // martes: el bloque está tomado entero
-assert.deepEqual(semanaCompleta.filter(s => s.cal && !s.deporte).map(s => s.fecha.slice(8)), ['26', '28']);
-const pl = L.planSemana('construccion', sl);
-assert.deepEqual(pl.map(d => d.ses.tipo), ['movilidad', 'fuerza', 'z2', 'fuerza']); // con fútbol, intervalos → Z2
-assert.deepEqual(L.planSemana('base', L.slotsManuales('2026-10-26', [1, 3, 5], '19:30', 75)).map(d => d.ses.n.split(' ')[0]), ['Fuerza', 'Cardio', 'Fuerza']);
+// Metas de la semana: fijas y variables; con fútbol la intensa fija pasa a Z2 variable
+assert.deepEqual(L.metasSemana('construccion').map(x => [x.id, x.fija]), [['fuerzaA', true], ['fuerzaB', true], ['intervalos', true], ['z2', false], ['movilidad', false]]);
+assert.deepEqual(L.metasSemana('especifica', true).map(x => x.id), ['fuerzaA', 'fuerzaB', 'z2', 'z2b'.replace('b', '2'), 'rounds']);
+const items = L.metasSemana('base');
+assert.deepEqual(L.pendientes(items, [{ item: 'fuerzaB', tipo: 'fuerza' }, { tipo: 'z2' }, { series: [] }]).map(x => x.id), ['z2b'.replace('b', '2'), 'movilidad']);
 
+// Día con el bloque libre: se queda en el bloque. Martes 27: Paseadora y Bruno lo tapan → hueco más cercano a 19:30
+const lun = L.dispDia(ev, '2026-10-26');
+assert.deepEqual(L.ubicar(lun, 60, L.aMs('2026-10-26', '19:30')), { ini: L.aMs('2026-10-26', '19:30'), min: 75, mover: false });
+const mar = L.dispDia(ev, '2026-10-27');
+assert.equal(mar.choque, 'Paseadora');
+assert.deepEqual(L.ubicar(mar, 60, L.aMs('2026-10-27', '19:30')), { ini: L.aMs('2026-10-27', '18:15'), min: 60, mover: true });
+// Hoy a las 18:40 ya no sirve el hueco de las 18:00: parte desde ahora (redondeado) y el viaje de 19 a 20 es fijo
+const jue = L.dispDia(ev, '2026-10-29', { ahora: new Date('2026-10-29T18:40') });
+assert.equal(L.hhmm(jue.huecos[0][0]), '20:00'); // viaje 19–20, fútbol 21:00
+assert.equal(jue.deporte, 'Fútbol');
+assert.equal(L.horaHabitual(ev), '19:30');
+
+// Reparto desde el jueves 29 (fase base): jueves con fútbol no recibe fuerza; fijas antes que variables
+const dias = ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01'].map(f => ({ fecha: f, d: L.dispDia(ev, f, { ahora: new Date('2026-10-29T10:00') }) }));
+const rep = L.distribuir('base', L.metasSemana('base', true), dias);
+assert.deepEqual(rep.dias.map(d => [d.item?.id, d.hora, d.min]), [['movilidad', '20:00', 25], ['fuerzaA', '19:30', 60], ['z2', '19:30', 35], ['fuerzaB', '19:30', 60]]);
+assert.deepEqual(rep.sinLugar.map(x => x.id), ['z22']); // la variable que no cupo queda a la vista
+// El usuario fija el sábado a las 10:00 con fuerza B (el día anterior): se respeta y hay que mover/crear el bloque
+const rep2 = L.distribuir('base', L.metasSemana('base'), dias.map(x => x.fecha === '2026-10-31' ? { ...x, elegido: { item: 'fuerzaB', hora: '10:00', min: 75 } } : x));
+assert.deepEqual([rep2.dias[2].item.id, rep2.dias[2].hora, rep2.dias[2].min, rep2.dias[2].mover, rep2.dias[2].elegido], ['fuerzaB', '10:00', 75, true, true]);
+assert.ok(!rep2.dias.some((d, i) => i !== 2 && d.item?.id === 'fuerzaB'));
 // Nutrición y racha
 assert.deepEqual(L.nutricion(80, 'fuerza', 60), { prot: 145, cho: 400, agua: 3.5, tip: L.TIP.fuerza });
 assert.equal(L.nutricion(null), null);
