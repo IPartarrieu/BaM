@@ -41,6 +41,7 @@
   #timer.on { display:flex; } #timer .t { font:700 88px/1 ui-monospace,monospace; margin:12px 0 24px; } #timer .fila button { min-width:76px; }
   .logro { display:flex; gap:10px; align-items:center; padding:8px 0; opacity:.35; } .logro.ok { opacity:1; } .logro b { font-size:24px; }
   select { width:100%; background:var(--panel2); color:var(--txt); border:1px solid #33405f; border-radius:8px; padding:10px; font:inherit; }
+  .campo { width:100%; background:var(--panel2); color:var(--txt); border:1px solid #33405f; border-radius:8px; padding:10px; font:inherit; }
   svg text { fill:var(--sub); font:12px system-ui; }
 </style>
 </head>
@@ -48,7 +49,7 @@
 <main id="app"></main>
 <div id="timer"><div class="sub" id="timerTxt">Descanso</div><div class="t" id="timerT">0:00</div>
   <div class="fila"><button class="mini" data-act="t-15">−15 s</button><button class="mini" data-act="t+15">+15 s</button><button class="mini" style="background:var(--ac)" data-act="tfin">Listo</button></div></div>
-<nav><button data-act="tab" data-tab="inicio">🏠 Inicio</button><button data-act="tab" data-tab="hoy">🥋 Entrenar</button><button data-act="tab" data-tab="avance">📊 Avance</button></nav>
+<nav><button data-act="tab" data-tab="inicio">🏠 Inicio</button><button data-act="tab" data-tab="hoy">🥋 Entrenar</button><button data-act="tab" data-tab="plan">🎯 Plan</button><button data-act="tab" data-tab="avance">📊 Avance</button></nav>
 <script type="module" src="app.js"></script>
 </body>
 </html>

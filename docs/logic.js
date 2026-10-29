@@ -71,10 +71,11 @@ const costo = (e, s) => s * ((e.w ?? 40) + e.d) + CAMBIO_SEG;
 
 // Core es fijo (rondas de ABS); el resto alterna sus ejercicios y llena el tiempo disponible.
 // Si un ejercicio no cabe completo, prueba con menos series (mínimo 2).
-export function armarRutina(minutos, grupos) {
+// factor: fracción de las series según la fase del plan (base 0,75, descarga 0,6).
+export function armarRutina(minutos, grupos, factor = 1) {
   const conAbs = grupos.includes('core');
   let libre = minutos * 60 - FIJO_SEG - (conAbs ? ABS_SEG : 0);
-  const listas = grupos.filter(g => !GRUPOS[g].fija).map(g => GRUPOS[g].ej.map(e => ({ ...e, g })));
+  const listas = grupos.filter(g => !GRUPOS[g].fija).map(g => GRUPOS[g].ej.map(e => ({ ...e, g, s: Math.max(2, Math.round(e.s * factor)) })));
   const orden = [];
   for (let i = 0; listas.some(l => i < l.length); i++) listas.forEach(l => l[i] && orden.push(l[i]));
   const ej = [];
@@ -101,11 +102,16 @@ export function sugerirKg(sesiones, e) {
   return e.kg;
 }
 
+// 'YYYY-MM-DD' a mediodía local (new Date('YYYY-MM-DD') es UTC y en Chile cae el día anterior).
+export const dia = f => typeof f === 'string' && f.length === 10 ? new Date(f + 'T12:00') : new Date(f);
+export const iso = d => { d = dia(d); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const sumarDias = (f, n) => { const d = dia(f); d.setDate(d.getDate() + n); return iso(d); };
+
 // Semana de lunes a domingo, identificada por el lunes 'YYYY-MM-DD' (hora local).
 export function lunes(fecha) {
-  const d = new Date(fecha); d.setHours(0, 0, 0, 0);
+  const d = dia(fecha); d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return iso(d);
 }
 
 export const META = 3;
@@ -187,4 +193,156 @@ export function interpretarClima(codigo, probLluvia = 0) {
   if ((codigo >= 51 && codigo <= 67) || (codigo >= 80 && codigo <= 82) || probLluvia >= 60) return { txt: 'Lluvia', i: '🌧️', lluvia: true, min: 45 };
   if (codigo <= 1) return { txt: 'Despejado', i: '☀️', lluvia: false, min: 75 };
   return { txt: codigo >= 45 ? 'Niebla' : 'Nublado', i: '⛅', lluvia: false, min: 60 };
+}
+
+// ================= Plan hacia una meta (ver METODOLOGIA.md) =================
+
+// Zonas por reserva de FC (Karvonen); FCmáx de Tanaka si no se conoce la real.
+export const ZONAS = [
+  [1, .5, .6, 'Recuperación', 'conversación fácil'], [2, .6, .7, 'Base aeróbica', 'frases completas'],
+  [3, .7, .8, 'Tempo', 'frases cortas'], [4, .8, .9, 'Umbral · round de lucha', 'pocas palabras'], [5, .9, 1, 'Máximo', 'no puedes hablar'],
+];
+export const fcMax = p => +p.fcMax || Math.round(208 - 0.7 * p.edad);
+export function zonas(p) {
+  if (!p?.edad || !p?.fcRep) return null;
+  const rep = +p.fcRep, res = fcMax(p) - rep;
+  return ZONAS.map(([z, a, b, n, t]) => ({ z, n, t, de: Math.round(rep + a * res), a: Math.round(rep + b * res) }));
+}
+
+export const MOVILIDAD = ['Cuello: isometría 4 direcciones · 3 × 10 s', 'Puente de lucha suave adelante y atrás · 2 × 8', 'Escape de cadera (camarón) · 2 largos', 'Levantada técnica · 2 × 5 por lado', 'Rotaciones de cadera (CARs) · 5 por lado', '90/90 con cambio · 2 × 8', 'Apertura torácica · 8 por lado', 'Dislocaciones de hombro con banda · 2 × 10'];
+export const ROUND = ['Sprawl × 5', 'Escape de cadera ida y vuelta', 'Swing kettlebell × 10', 'Oso (bear crawl) 10 m', 'Levantada técnica × 4', 'Burpee × 5'];
+
+export const FASES = {
+  base: { n: 'Base', factor: .75, B: ['empuje', 'brazos', 'core'], z2: 35,
+    obj: 'Adaptar tendones y articulaciones y construir la base aeróbica. Fuerza con 2–3 repeticiones en reserva (RPE 6–7); cardio en Z2.',
+    sem: ['fuerzaA', 'z2', 'fuerzaB', 'movilidad', 'z2'] },
+  construccion: { n: 'Construcción', factor: 1, B: ['empuje', 'brazos', 'potencia'], z2: 40,
+    obj: 'Subir la carga (RPE 7–8) y sumar intervalos en Z4 para la potencia aeróbica.',
+    sem: ['fuerzaA', 'intervalos', 'fuerzaB', 'z2', 'movilidad'] },
+  especifica: { n: 'Específica BJJ', factor: .85, B: ['empuje', 'brazos', 'potencia'], z2: 40, rounds: 6,
+    obj: 'Simular la lucha: rounds de 5 min de trabajo continuo en Z4–Z5 con 1 min de pausa. La fuerza se mantiene.',
+    sem: ['fuerzaA', 'rounds', 'fuerzaB', 'z2', 'rounds'] },
+  descarga: { n: 'Descarga', factor: .6, B: ['empuje', 'brazos', 'potencia'], z2: 30, rounds: 3,
+    obj: 'Bajar el volumen ~40 % y mantener la intensidad para llegar descansado a la meta.',
+    sem: ['fuerzaA', 'rounds', 'z2', 'movilidad', 'movilidad'] },
+};
+
+// Fase de la semana s (0 = la del inicio) en un plan de `total` semanas; la última es descarga si hay ≥ 3.
+export function faseDe(s, total) {
+  if (total >= 3 && s === total - 1) return 'descarga';
+  const f = s / Math.max(1, total - (total >= 3 ? 1 : 0));
+  return f < 1 / 3 ? 'base' : f < 2 / 3 ? 'construccion' : 'especifica';
+}
+
+const semanasEntre = (a, b) => Math.round((dia(lunes(b)) - dia(lunes(a))) / 6048e5);
+// meta = { nombre, inicio: 'YYYY-MM-DD', fecha: 'YYYY-MM-DD' }
+export function estadoMeta(meta, hoy = new Date()) {
+  const total = semanasEntre(meta.inicio, meta.fecha) + 1, s = semanasEntre(meta.inicio, hoy);
+  const dias = Math.round((dia(meta.fecha) - dia(iso(hoy))) / 864e5);
+  if (dias < 0) return { fin: true, total, dias };
+  return { semana: s, total, dias, fase: faseDe(Math.min(s, total - 1), total) };
+}
+
+// Bloques de cardio: [{seg, z, txt}] con entrada en calor y vuelta a la calma de 5 min.
+const conCalor = b => [{ seg: 300, z: 1, txt: 'Entrada en calor' }, ...b, { seg: 300, z: 1, txt: 'Vuelta a la calma' }];
+const series = (n, trab, desc, z, txt) => Array.from({ length: n }, (_, i) => [{ seg: trab, z, txt: `${txt} ${i + 1}/${n}` }, i < n - 1 && { seg: desc, z: 1, txt: 'Pausa' }]).flat().filter(Boolean);
+const caben = (min, trab, desc) => Math.floor((min * 60 - 600 + desc) / (trab + desc));
+export const segBloques = b => b.reduce((a, x) => a + x.seg, 0);
+
+// Una sesión del plan ajustada a los minutos disponibles.
+export function sesion(tipo, fase, min = 60) {
+  const F = FASES[fase];
+  if (tipo === 'fuerzaA') return { tipo: 'fuerza', i: '🏋️', n: 'Fuerza A · piernas y espalda', min, grupos: ['piernas', 'espalda', 'core'], factor: F.factor, dura: true };
+  if (tipo === 'fuerzaB') return { tipo: 'fuerza', i: '🏋️', n: `Fuerza B · empuje, agarre y ${F.B[2] === 'core' ? 'core' : 'potencia'}`, min, grupos: F.B, factor: F.factor, dura: true };
+  if (tipo === 'z2') {
+    const m = Math.min(F.z2, min);
+    return { tipo, i: '🫁', n: 'Cardio base Z2', modo: 'Trote, bici, remo o elíptica', min: m, bloques: [{ seg: m * 60, z: 2, txt: 'Z2 continuo' }] };
+  }
+  if (tipo === 'intervalos') {
+    const n = Math.min(6, caben(min, 180, 120));
+    return { tipo, i: '⏱️', n: `Intervalos ${n} × 3 min Z4`, modo: 'Bici, remo o assault bike', dura: true, bloques: conCalor(series(n, 180, 120, 4, 'Intervalo')) };
+  }
+  if (tipo === 'rounds') {
+    const n = Math.min(F.rounds ?? 6, caben(min, 300, 60));
+    return { tipo, i: '🥋', n: `Rounds de lucha ${n} × 5 min`, modo: 'Circuito continuo, sin parar dentro del round', items: ROUND, dura: true, bloques: conCalor(series(n, 300, 60, 4, 'Round')) };
+  }
+  return { tipo: 'movilidad', i: '🧘', n: 'Movilidad + cuello', min: 25, items: MOVILIDAD };
+}
+// Duración real de cualquier sesión del plan.
+export const minSesion = x => x.bloques ? Math.round(segBloques(x.bloques) / 60) : x.min;
+
+// Huecos del día: días con dia/hora/min disponibles y si hay deporte (fútbol, partido…).
+export const RE_ENTRENO = /ejercicio|entren|gym|gimnasio/i, RE_SUAVE = /suave|elong/i, RE_DEPORTE = /f[uú]tbol|partido|pichanga|bjj|jiu|p[aá]del|tenis/i;
+const hhmm = ms => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const masLargo = (ini, fin, ocup) => { // hueco libre más largo dentro de [ini, fin]
+  let mejor = [ini, ini], t = ini;
+  for (const [a, b] of [...ocup.filter(([a, b]) => b > ini && a < fin).sort((x, y) => x[0] - y[0]), [fin, fin]]) {
+    if (Math.min(a, fin) - t > mejor[1] - mejor[0]) mejor = [t, Math.min(a, fin)];
+    t = Math.max(t, b);
+  }
+  return mejor;
+};
+// eventos: [{t, ini, fin}] (sin los de día completo). Lee la semana del lunes `l` desde `desde`.
+// 1º usa los bloques "Ejercicio" del calendario (recortados si algo se cruza); si faltan días,
+// busca huecos de `min` minutos entre `de` y `a` horas en los días sin bloque.
+export function slotsDeEventos(eventos, l, { dias = 4, min = 75, desde = l, de = 9, a = 21 } = {}) {
+  const ev = eventos.map(e => ({ t: e.t || '', ini: +dia(e.ini), fin: +dia(e.fin) }));
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const f = sumarDias(l, i);
+    if (f < desde) continue;
+    const delDia = ev.filter(e => iso(e.ini) === f);
+    const deporte = delDia.find(e => RE_DEPORTE.test(e.t))?.t;
+    const bloque = delDia.filter(e => RE_ENTRENO.test(e.t) && !RE_SUAVE.test(e.t)).sort((x, y) => (y.fin - y.ini) - (x.fin - x.ini))[0];
+    const ocup = delDia.filter(e => e !== bloque).map(e => [e.ini, e.fin]);
+    if (bloque) {
+      const [x, y] = masLargo(bloque.ini, bloque.fin, ocup), m = Math.round((y - x) / 6e4);
+      out.push({ fecha: f, deporte, cal: true, ...(m >= 30 ? { hora: hhmm(x), min: m } : {}) });
+    } else {
+      const base = +dia(f + 'T00:00'), [x, y] = masLargo(base + de * 36e5, base + a * 36e5, ocup);
+      out.push({ fecha: f, deporte, ...((y - x) / 6e4 >= min ? { hora: hhmm(x), min, extra: true } : {}) });
+    }
+  }
+  const usar = new Set(out.filter(s => s.hora && !s.deporte).sort((x, y) => !!x.extra - !!y.extra || (x.fecha < y.fecha ? -1 : 1)).slice(0, dias).map(s => s.fecha));
+  return out.filter(s => usar.has(s.fecha) || s.deporte).map(s => usar.has(s.fecha) ? s : { fecha: s.fecha, deporte: s.deporte, ...(s.hora && { hora: s.hora, min: Math.min(s.min, 30) }) });
+}
+// Sin calendario: días de la semana elegidos (1 = lunes … 7 = domingo) a una hora fija.
+export const slotsManuales = (l, diasSem, hora, min, desde = l) =>
+  diasSem.map(d => ({ fecha: sumarDias(l, d - 1), hora, min })).filter(s => s.fecha >= desde).sort((a, b) => a.fecha < b.fecha ? -1 : 1);
+
+// Asigna las sesiones de la fase a los días disponibles. Con deporte en la semana, una sesión de
+// intervalos o rounds pasa a Z2 (el partido ya es trabajo intermitente) y ese día solo va movilidad.
+export function planSemana(fase, slots) {
+  const cola = [...FASES[fase].sem], i = cola.findIndex(t => t === 'intervalos' || t === 'rounds');
+  if (slots.some(s => s.deporte) && i >= 0) cola[i] = 'z2';
+  return slots.map(s => ({ ...s, ses: !s.hora ? null : s.deporte ? sesion('movilidad', fase) : sesion(cola.shift() ?? 'movilidad', fase, s.min) }));
+}
+
+// Nutrición del día por kg de peso (ISSN, ACSM): proteína 1,8 g/kg; carbohidrato según la carga; agua 35 ml/kg + 0,6 L/h.
+export const CHO = { descanso: 3, movilidad: 3, z2: 4, fuerza: 5, intervalos: 6, rounds: 6, deporte: 6 };
+export const TIP = {
+  descanso: 'Día liviano: carbohidrato moderado y proteína repartida en 4 comidas.',
+  movilidad: 'Día liviano: carbohidrato moderado y proteína repartida en 4 comidas.',
+  z2: 'Sesión aeróbica: no requiere nada especial; agua durante.',
+  fuerza: 'Antes (1–3 h): comida con carbohidrato y proteína. Después: 20–40 g de proteína en las 2 h siguientes.',
+  intervalos: 'Sesión intensa: carbohidrato 1–3 h antes, 400–800 ml de agua por hora y carbohidrato + proteína después.',
+  rounds: 'Sesión intensa: carbohidrato 1–3 h antes, 400–800 ml de agua por hora y carbohidrato + proteína después.',
+  deporte: 'Día de partido: carbohidrato 1–3 h antes y repón con carbohidrato + proteína al terminar.',
+};
+export function nutricion(peso, tipo = 'descanso', minEntreno = 0) {
+  if (!+peso) return null;
+  return { prot: Math.round(peso * 1.8 / 5) * 5, cho: Math.round(peso * CHO[tipo] / 10) * 10,
+    agua: Math.round((peso * .035 + minEntreno / 60 * .6) * 4) / 4, tip: TIP[tipo] };
+}
+
+// Metas del día. Cuenta para la racha si te moviste y cumpliste al menos 4 de las 6.
+export const diaCumplido = b => !!b?.mov && Object.values(b).filter(v => v === true).length >= 4;
+export function racha(basicos, hoy = iso(new Date())) {
+  let n = 0, f = diaCumplido(basicos[hoy]) ? hoy : sumarDias(hoy, -1); // hoy no corta la racha hasta que termine
+  while (diaCumplido(basicos[f])) { n++; f = sumarDias(f, -1); }
+  let mejor = 0, run = 0, prev = null;
+  for (const d of Object.keys(basicos).filter(d => diaCumplido(basicos[d])).sort()) {
+    run = prev && sumarDias(prev, 1) === d ? run + 1 : 1; mejor = Math.max(mejor, run); prev = d;
+  }
+  return { actual: n, mejor };
 }

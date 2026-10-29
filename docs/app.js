@@ -9,10 +9,11 @@ const nombreEj = id => Object.values(L.GRUPOS).flatMap(G => G.ej).concat(L.ABS).
 let db = cargar();
 let tab = db.actual ? 'hoy' : 'inicio';
 let musculo = null;
-let form = { min: null, grupos: [] };
+let form = { min: null, grupos: [], factor: 1, plan: null };
 let clima = null;
 let exSel = null;
 let audio = null, wake = null;
+let calMsg = '';
 
 function cargar() {
   try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.sesiones)) {
@@ -20,9 +21,12 @@ function cargar() {
       s.series.forEach(x => x.g === 'abs' && (x.g = 'core'));
       if (s.abs && !s.grupos.includes('core')) s.grupos.push('core');
     }
-    return { basicos: {}, ...d };
+    return { ...defaults(), ...d };
   } } catch {}
-  return { sesiones: [], actual: null, basicos: {} };
+  return { sesiones: [], actual: null, ...defaults() };
+}
+function defaults() {
+  return { basicos: {}, perfil: {}, meta: null, agenda: {}, agendaLeida: null, actividad: [], horario: { porSemana: 4, dias: [1, 2, 3, 4], hora: '19:30', min: 75 } };
 }
 const guardar = () => localStorage.setItem(KEY, JSON.stringify(db));
 
@@ -45,12 +49,55 @@ const minElegido = () => form.min ?? clima?.min ?? 60;
 const kgTxt = (e, kg) => e.kg === null ? 'peso corporal' : e.kg === 0 ? `lastre ${kg} kg` : `${kg} kg`;
 
 const COLOR = { piernas: '#e5484d', espalda: '#4c8dff', empuje: '#f0b429', brazos: '#3fb950', potencia: '#a371f7', core: '#ff8c42' };
-const BASICOS = [['agua', '💧 Llevar la botella de agua'], ['snack', '🍎 Snack saludable'], ['elongar', '🧘 Elongar']];
 const diaHoy = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD local
+const fechaTxt = (f, o) => L.dia(f).toLocaleDateString('es-CL', o);
+
+function semanaPlan(fecha = new Date()) {
+  if (!db.meta) return null;
+  const est = L.estadoMeta(db.meta, fecha);
+  if (est.fin) return { est, dias: [] };
+  const l = L.lunes(fecha), h = db.horario, desde = l < db.meta.inicio ? db.meta.inicio : l;
+  const slots = db.agenda[l] ?? L.slotsManuales(l, h.dias, h.hora, h.min, desde);
+  return { est, l, dias: L.planSemana(est.fase, slots).filter(d => d.fecha <= db.meta.fecha) };
+}
+const hechaPlan = f => db.sesiones.some(s => L.iso(s.fecha) === f);
 const nombreGrupo = g => `${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre}`;
 
+function tarjetaMeta() {
+  const m = db.meta, est = m && semanaPlan().est;
+  if (!m) return `<div class="card"><h2>🎯 Tu meta</h2><div class="sub">Define una fecha y te armo el plan semana a semana.</div><button class="btn" data-act="tab" data-tab="plan">Crear mi plan</button></div>`;
+  if (est.fin) return `<div class="card" style="border:2px solid var(--ac)"><h2>¡Llegó el día! Inscríbete en las clases de BJJ 🥋</h2><button class="btn" data-act="tab" data-tab="plan">Crear una meta nueva</button></div>`;
+  return `<div class="card"><h2>🎯 ${esc(m.nombre)} · faltan ${est.dias} días</h2>
+    <div class="sub">Semana ${est.semana + 1} de ${est.total} · Fase ${L.FASES[est.fase].n}</div>
+    <div class="barra"><i style="width:${(est.semana + 1) / est.total * 100}%"></i></div><div class="sub">${L.FASES[est.fase].obj}</div></div>`;
+}
+
+function tarjetaHoy(hp) {
+  if (!db.meta) return '';
+  const ses = hp?.ses, hecha = hp && hechaPlan(hp.fecha);
+  const dep = hp?.deporte ? `<div class="sub">⚽ ${esc(hp.deporte)}: cuenta como entrenamiento intenso</div>` : '';
+  if (ses) return `<div class="card"><h2>Hoy</h2><div>${ses.i} ${ses.n} · ${hp.hora} · ${L.minSesion(ses)} min${hecha ? ' · ✓ hecha' : ''}</div>${dep}
+    <button class="btn" data-act="planEmpezar">Empezar</button></div>`;
+  return `<div class="card"><h2>Hoy</h2>${dep}<div class="sub">Día libre: camina o haz movilidad 20 min</div></div>`;
+}
+
+const tipoDiaDe = hp => hp?.deporte && !hp?.ses ? 'deporte' : hp?.ses?.tipo ?? 'descanso';
+const nutDe = hp => L.nutricion(db.perfil.peso, tipoDiaDe(hp), hp?.ses ? L.minSesion(hp.ses) : 0);
+const ACTIVIDADES = ['Caminata', 'Trote', 'Bici', 'Fútbol', 'Clase de BJJ', 'Movilidad', 'Otra'];
+
 function vistaInicio() {
-  const b = db.basicos[diaHoy()] || {}, hechos = BASICOS.filter(([k]) => b[k]).length;
+  const hp = semanaPlan()?.dias.find(d => d.fecha === diaHoy()), nut = nutDe(hp), hoy = diaHoy();
+  const b = db.basicos[hoy] || {}, racha = L.racha(db.basicos, hoy);
+  const metas = [
+    ['mov', hp?.ses ? `🏃 ${hp.ses.n}` : '🚶 Caminar o movilidad 20 min'],
+    ['agua', nut ? `💧 Agua ${String(nut.agua).replace(".", ",")} L` : '💧 Llevar la botella de agua'],
+    ['prot', nut ? `🍗 Proteína ${nut.prot} g` : '🍗 Proteína en cada comida'],
+    ['snack', '🍎 Snack saludable'], ['elongar', '🧘 Elongar 10 min'], ['sueno', '😴 Dormir 7 h o más'],
+  ];
+  const puntos = Array.from({ length: 28 }, (_, i) => { const f = L.sumarDias(hoy, i - 27);
+    return `<span style="width:10px;height:10px;border-radius:50%;background:${L.diaCumplido(db.basicos[f]) ? 'var(--ok)' : 'var(--panel2)'};${f === hoy ? 'border:2px solid #fff;box-sizing:border-box' : ''}"></span>`; }).join('');
+  const deHoy = db.actividad.filter(a => a.fecha === hoy);
+  const stat = (v, t) => `<div><div style="font-size:24px;font-weight:700">${v}</div><div class="sub">${t}</div></div>`;
   const M = musculo && L.MUSCULOS[musculo];
   const info = !M ? '<div class="sub" style="text-align:center">Toca un músculo para ver su grupo y qué ejercicios lo trabajan.</div>' :
     `<h3 style="color:${COLOR[M[1]]}">${M[0]}</h3><div class="sub">Grupo: ${nombreGrupo(M[1])}</div>
@@ -59,8 +106,18 @@ function vistaInicio() {
   return `<div class="sub" style="letter-spacing:.04em"><b style="color:var(--ac)">BaM</b> · Becoming a Machine</div>
   <h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   ${new Date().getDay() === 1 ? tarjetaLunes() : ''}
-  <div class="card"><h2>Básicos de hoy <span class="sub">${hechos}/${BASICOS.length}${hechos === BASICOS.length ? ' · ✓ listo' : ''}</span></h2>
-    ${BASICOS.map(([k, t]) => `<label class="switch" style="padding:8px 0"><span>${t}</span><input type="checkbox" data-act="basico" data-v="${k}" ${b[k] ? 'checked' : ''}></label>`).join('')}</div>
+  ${tarjetaMeta()}${tarjetaHoy(hp)}
+  <div class="card"><h2>Metas de hoy <span class="sub">🔥 ${racha.actual} días</span></h2>
+    <div class="sub">mejor racha ${racha.mejor} · cuenta si te mueves y cumples 4 de 6</div>
+    ${metas.map(([k, t]) => `<label class="switch" style="padding:8px 0"><span>${t}</span><input type="checkbox" data-act="basico" data-v="${k}" ${b[k] ? 'checked' : ''}></label>`).join('')}
+    <div class="fila" style="gap:4px;margin-top:8px">${puntos}</div></div>
+  <div class="card"><h2>Registrar actividad</h2>
+    <div class="fila"><select id="actTipo" style="flex:2">${ACTIVIDADES.map(a => `<option>${a}</option>`).join('')}</select>
+    <input id="actMin" inputmode="numeric" value="30" aria-label="minutos" style="flex:1;min-width:60px" class="campo"><button class="mini" data-act="actividad">Registrar</button></div>
+    ${deHoy.map(a => `<div class="sub">${esc(a.tipo)} · ${esc(a.min)} min</div>`).join('')}</div>
+  <div class="card"><h2>Nutrición de hoy</h2>${nut
+    ? `<div class="fila" style="justify-content:space-around;text-align:center">${stat(nut.prot + ' g', 'proteína')}${stat(nut.cho + ' g', 'carbohidrato')}${stat(String(nut.agua).replace(".", ",") + ' L', 'agua')}</div><div class="sub" style="margin-top:8px">${nut.tip}</div>`
+    : '<div class="sub">Ingresa tu peso en 🎯 Plan para calcular proteína, carbohidrato y agua.</div>'}</div>
   <div class="card"><h2>Mapa muscular</h2>${silueta()}
     <div class="fila sub" style="justify-content:center;gap:12px;margin:6px 0 10px">${Object.entries(COLOR).filter(([g]) => g !== 'potencia').map(([g, c]) => `<span><b style="color:${c}">●</b> ${L.GRUPOS[g].nombre.split(' ')[0]}</span>`).join('')}</div>
     ${info}</div>
@@ -135,11 +192,14 @@ function silueta() {
 
 function vistaHoy() {
   const r = L.resumenSemana(db.sesiones), min = minElegido();
-  const plan = form.grupos.length ? L.armarRutina(min, form.grupos) : null;
+  const plan = form.grupos.length ? L.armarRutina(min, form.grupos, form.factor ?? 1) : null;
+  const hp = semanaPlan()?.dias.find(d => d.fecha === diaHoy());
+  const delPlan = hp?.ses && !hechaPlan(hp.fecha) ? `<div class="card" style="border:2px solid var(--ac)"><h2>Sesión del plan</h2><div>${hp.ses.i} ${hp.ses.n} · ${L.minSesion(hp.ses)} min</div><button class="btn" data-act="planEmpezar">Empezar</button></div>` : '';
   const climaHtml = !clima ? '<span class="sub">Consultando el clima…</span>' : clima.error ? '<span class="sub">Sin datos de clima (sin conexión)</span>' :
     `<div class="fila"><span style="font-size:38px">${clima.i}</span><div><b>${clima.txt}, ${clima.temp} °C</b>
      <div class="sub">Lluvia ${clima.prob}% · ${clima.lluvia ? 'día de lluvia: probablemente haya menos tiempo, prioriza lo esencial' : 'buen día: puede que haya más tiempo para entrenar'}</div></div></div>`;
   return `<h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+  ${delPlan}<h2 style="margin-top:16px">${delPlan ? 'O entrena libre' : 'Entrena libre'}</h2>
   <div class="card">${climaHtml}</div>
   <div class="card"><h2>Semana: ${r.sesiones}/${L.META} sesiones</h2><div class="barra"><i style="width:${Math.min(100, r.sesiones / L.META * 100)}%"></i></div>
     <div class="sub">${r.pendientes.length ? 'Falta: ' + r.pendientes.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' · ') : '¡Todos los grupos trabajados esta semana!'}</div></div>
@@ -153,7 +213,7 @@ function vistaHoy() {
 
 function vistaPlan(plan) {
   if (!plan.ej.length && !plan.conAbs) return `<div class="card"><h2>Rutina propuesta</h2><div class="sub">No alcanza el tiempo para ejercicios: sube los minutos o quita los abdominales.</div></div>`;
-  return `<div class="card"><h2>Rutina propuesta</h2><ul class="lista">
+  return `<div class="card" id="rutina"><h2>Rutina propuesta</h2><ul class="lista">
     <li>Calentamiento de articulaciones · 5 min</li>
     ${plan.ej.map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · ${kgTxt(e, L.sugerirKg(db.sesiones, e))}</li>`).join('')}
     ${plan.conAbs ? `<li><b style="color:var(--txt)">🔥 Core: abdominales con disco</b> · ${L.ABS_RONDAS} rondas fijas · ${Math.round(L.ABS_SEG / 60)} min</li>` : ''}
@@ -175,6 +235,70 @@ function vistaEntreno() {
   ${bloqueFijo('elo', `${a.abs ? 4 : 3} · Elongar`, L.ELONGACION)}
   <button class="btn" data-act="terminar">Terminar y guardar</button>
   <button class="btn sec" data-act="cancelar">Descartar sesión</button>`;
+}
+
+const mmss = seg => `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
+function vistaCardio() {
+  const a = db.actual, ses = a.ses, zs = L.zonas(db.perfil);
+  const zona = z => zs ? zs.find(x => x.z === z) : null;
+  const zUsadas = [...new Set((ses.bloques || []).map(b => b.z))];
+  return `<h1>${ses.i} ${ses.n}</h1><div class="sub">${ses.modo || ''}</div>
+  ${zUsadas.length ? `<div class="card"><h2>Zonas</h2>${zUsadas.map(z => { const Z = zona(z), N = L.ZONAS.find(x => x[0] === z);
+    return `<div class="sub">${Z ? `Z${z} · ${Z.de}–${Z.a} lpm · ${Z.t}` : `Z${z} · ${N[4]}`}</div>`; }).join('')}</div>` : ''}
+  ${ses.items ? `<div class="card"><ul class="lista">${ses.items.map(i => `<li>${i}</li>`).join('')}</ul></div>` : ''}
+  ${ses.bloques ? `<div class="card"><h2>Bloques</h2>${ses.bloques.map((b, i) => `<div class="${i === a.paso ? '' : 'sub'}" style="padding:3px 0;${i === a.paso ? 'color:var(--ac);font-weight:700' : ''}">${b.txt} · ${mmss(b.seg)} · Z${b.z}</div>`).join('')}
+    <button class="btn" data-act="secuencia">▶ Iniciar</button></div>`
+    : `<button class="btn sec" data-act="movilidad">⏱ Iniciar 25:00</button>`}
+  <div class="card"><h2>Al terminar</h2>
+    <div class="fila sub">Minutos <input class="campo" id="cMin" inputmode="numeric" value="${L.minSesion(ses)}" style="width:70px">
+    FC promedio <input class="campo" id="cFc" inputmode="numeric" placeholder="opcional" style="width:90px">
+    RPE <select id="cRpe" style="width:auto">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option ${n === 7 ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
+  <button class="btn" data-act="terminarCardio">Terminar y guardar</button>
+  <button class="btn sec" data-act="cancelar">Descartar sesión</button>`;
+}
+
+const chip = (act, v, txt, sel) => `<button data-act="${act}" data-v="${v}" class="${sel ? 'sel' : ''}">${txt}</button>`;
+function vistaMeta() {
+  const m = db.meta, h = db.horario, p = db.perfil, sp = semanaPlan(), zs = L.zonas(p);
+  const campo = (c, t, ph = '') => `<label class="sub" style="display:block;margin-top:6px">${t}<input class="campo" inputmode="numeric" data-perfil="${c}" value="${esc(p[c] ?? '')}" placeholder="${ph}"></label>`;
+  const linea = !m ? '' : Array.from({ length: L.estadoMeta(m, m.fecha).total }, (_, s) => {
+    const act = sp && !sp.est.fin && sp.est.semana === s;
+    return `<div class="sub" style="padding:4px 8px;border-left:3px solid ${act ? 'var(--ac)' : 'transparent'};${act ? 'color:var(--txt);font-weight:700' : ''}">Sem ${s + 1} · ${fechaTxt(L.sumarDias(L.lunes(m.inicio), s * 7), { day: 'numeric', month: 'short' })} · ${L.FASES[L.faseDe(s, L.estadoMeta(m, m.fecha).total)].n}</div>`;
+  }).join('');
+  const leida = db.agenda[L.lunes(new Date())];
+  return `<h1>🎯 Plan</h1>
+  <div class="card"><h2>🎯 Tu meta</h2>
+    <input class="campo" id="mNombre" value="${esc(m?.nombre ?? 'Volver a BJJ')}" aria-label="nombre de la meta">
+    <input class="campo" id="mFecha" type="date" value="${m?.fecha ?? L.sumarDias(diaHoy(), 28)}" aria-label="fecha de la meta" style="margin-top:6px">
+    <button class="btn" data-act="guardarMeta">Guardar meta</button>
+    ${m ? `<div style="margin-top:10px">${linea}</div><button class="mini" style="background:var(--panel2);margin-top:8px" data-act="borrarMeta">Borrar meta</button>` : ''}</div>
+  <div class="card"><h2>Perfil</h2>${campo('edad', 'Edad')}${campo('peso', 'Peso (kg)')}${campo('fcRep', 'FC en reposo')}${campo('fcMax', 'FC máxima (opcional)', p.edad ? `estimada ${L.fcMax(p)}` : '')}
+    ${zs ? `<table style="width:100%;margin-top:10px;font-size:14px;border-collapse:collapse">${zs.map(z => `<tr><td>Z${z.z}</td><td>${z.n}</td><td>${z.de}–${z.a} lpm</td><td class="sub">${z.t}</td></tr>`).join('')}</table>`
+      : '<div class="sub" style="margin-top:8px">Con edad y FC en reposo calculo tus zonas (Karvonen).</div>'}
+    <div class="sub" style="margin-top:8px">FC en reposo: mídela al despertar, acostado, 3 días seguidos.</div></div>
+  <div class="card"><h2>Horario</h2>
+    <div class="sub">Sesiones por semana</div><div class="fila chips">${[3, 4, 5].map(n => chip('porSemana', n, n, h.porSemana === n)).join('')}</div>
+    <div class="sub" style="margin-top:8px">Días</div><div class="fila chips">${[...'LMXJVSD'].map((d, i) => chip('diaSem', i + 1, d, h.dias.includes(i + 1))).join('')}</div>
+    <div class="sub" style="margin-top:8px">Hora</div><input class="campo" type="time" id="hHora" value="${h.hora}" aria-label="hora">
+    <div class="sub" style="margin-top:8px">Minutos</div><div class="fila chips">${[45, 60, 75, 90].map(n => chip('minSes', n, n, h.min === n)).join('')}</div>
+    <input class="campo" id="calUrl" type="url" placeholder="Enlace del Apps Script (…/exec?token=…)" value="${esc(db.calUrl ?? '')}" aria-label="enlace del calendario" style="margin-top:10px">
+    <button class="btn sec" data-act="calendario">📅 Leer mi Google Calendar</button>
+    <div class="sub" style="margin-top:6px">Toma los bloques 'Ejercicio' de tu calendario; si algo se cruza, acorta la sesión. El fútbol cuenta como carga. Si faltan días, busca huecos libres entre 9:00 y 21:00.</div>
+    ${calMsg ? `<div style="margin-top:8px;color:#f0b429">${esc(calMsg)}</div>` : ''}
+    ${leida ? `<div class="sub" style="margin-top:8px">Leído del calendario: ${fechaTxt(db.agendaLeida, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div><button class="mini" style="background:var(--panel2)" data-act="horarioFijo">Usar horario fijo</button>` : ''}</div>
+  ${m ? cardSemana(sp) : ''}`;
+}
+
+function cardSemana(sp) {
+  if (sp.est.fin) return '';
+  const hechos = sp.dias.filter(d => d.ses && hechaPlan(d.fecha));
+  const z2 = sp.dias.filter(d => d.ses?.tipo === 'z2'), z2h = z2.filter(d => hechaPlan(d.fecha));
+  const min = ds => ds.reduce((n, d) => n + L.minSesion(d.ses), 0);
+  const prox = L.estadoMeta(db.meta, L.sumarDias(sp.l, 7)), nuevaFase = !prox.fin && prox.fase !== sp.est.fase;
+  return `<div class="card"><h2>Esta semana</h2>
+    <div class="sub">${hechos.length}/${sp.dias.filter(d => d.ses).length} sesiones · Z2 ${min(z2h)}/${min(z2)} min · ${hechos.filter(d => d.ses.dura).length} intensas</div>
+    ${sp.dias.map(d => `<div style="padding:5px 0;border-bottom:1px solid var(--panel2)">${fechaTxt(d.fecha, { weekday: 'short', day: 'numeric' })} · ${d.hora ?? '—'} · ${d.ses ? `${d.ses.i} ${d.ses.n} · ${L.minSesion(d.ses)} min` : 'libre'}${hechaPlan(d.fecha) ? ' ✓' : ''}${d.deporte ? ` <span class="sub">⚽ ${esc(d.deporte)}</span>` : ''}</div>`).join('')}
+    ${nuevaFase ? `<div class="sub" style="margin-top:8px">Próxima semana: Fase ${L.FASES[prox.fase].n}</div>` : ''}</div>`;
 }
 
 const transcurrido = () => db.actual ? `${Math.floor((Date.now() - new Date(db.actual.inicio)) / 60000)} min` : '';
@@ -214,6 +338,7 @@ function tarjetaAbs() {
     <div class="fila sub">Disco <input inputmode="decimal" data-k="abskg" value="${esc(a.absKg)}" style="width:70px;background:var(--panel2);color:var(--txt);border:1px solid #33405f;border-radius:8px;padding:6px;text-align:center"> kg · ${L.ABS_DESC_EJ} s entre ejercicios, ${L.ABS_DESC_RONDA} s entre rondas</div>${html}</div>`;
 }
 
+const ICONO = { z2: '🫁', intervalos: '⏱️', rounds: '🥋', movilidad: '🧘' };
 function vistaAvance() {
   const r = L.resumenSemana(db.sesiones), nv = L.niveles(db.sesiones);
   const conKg = [...new Set(db.sesiones.flatMap(s => s.series.filter(x => x.kg !== null && x.kg !== undefined).map(x => x.ex)))];
@@ -227,8 +352,8 @@ function vistaAvance() {
     : '<div class="sub">Aparecerá cuando registres series con peso.</div>'}</div>
   <div class="card"><h2>Logros de la semana</h2>${L.logros(db.sesiones).map(l => `<div class="logro ${l.ok ? 'ok' : ''}"><b>${l.i}</b><span>${l.t}</span></div>`).join('')}</div>
   <div class="card"><h2>Historial</h2>${db.sesiones.slice(-10).reverse().map(s => `<div style="padding:6px 0;border-bottom:1px solid var(--panel2)">
-    <b>${new Date(s.fecha).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' })}</b> · ${(s.grupos || []).map(g => L.GRUPOS[g]?.icono ?? '').join(' ')}
-    <span class="sub">· ${esc(s.duracionMin)} min · ${s.series.length} series${s.abs ? ' · abs' : ''}${s.clima ? ' · ' + esc(s.clima.txt) : ''}</span></div>`).join('') || '<div class="sub">Todavía no hay sesiones.</div>'}</div>
+    <b>${new Date(s.fecha).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' })}</b> · ${s.tipo && s.tipo !== 'fuerza' ? ICONO[s.tipo] ?? '' : (s.grupos || []).map(g => L.GRUPOS[g]?.icono ?? '').join(' ')}
+    <span class="sub">· ${esc(s.duracionMin)} min${s.tipo && s.tipo !== 'fuerza' ? '' : ` · ${s.series.length} series`}${s.rpe ? ` · RPE ${esc(s.rpe)}` : ''}${s.fcProm ? ` · ${esc(s.fcProm)} lpm` : ''}${s.abs ? ' · abs' : ''}${s.clima ? ' · ' + esc(s.clima.txt) : ''}</span></div>`).join('') || '<div class="sub">Todavía no hay sesiones.</div>'}</div>
   <div class="card"><h2>Respaldo</h2><div class="sub">Los datos viven solo en este teléfono. Descarga un respaldo de vez en cuando.</div>
     <button class="btn sec" data-act="exportar">Descargar respaldo</button>
     <label class="btn sec" style="text-align:center">Restaurar respaldo<input type="file" accept="application/json,.json" data-act="importar" hidden></label></div>`;
@@ -268,13 +393,15 @@ function grafico(pts) {
 
 function render() {
   const enCurso = tab === 'hoy' && db.actual;
-  $('#app').innerHTML = tab === 'inicio' ? vistaInicio() : tab === 'avance' ? vistaAvance() : enCurso ? vistaEntreno() : vistaHoy();
+  $('#app').innerHTML = tab === 'inicio' ? vistaInicio() : tab === 'avance' ? vistaAvance() : tab === 'plan' ? vistaMeta()
+    : enCurso ? (db.actual.tipo ? vistaCardio() : vistaEntreno()) : vistaHoy();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('sel', b.dataset.tab === tab));
 }
 
 // ---------- timer de descanso (por hora de término: sigue bien si la pantalla se bloquea) ----------
-let tFin = 0, tInt = null;
-function timer(seg, txt) {
+let tFin = 0, tInt = null, tCb = null;
+function timer(seg, txt, alTerminar) {
+  tCb = alTerminar || null;
   tFin = Date.now() + seg * 1000;
   $('#timerTxt').textContent = txt;
   $('#timer').classList.add('on');
@@ -285,6 +412,7 @@ function tick() {
   $('#timerT').textContent = `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`;
   if (r > 0) return;
   clearInterval(tInt);
+  if (tCb) { const cb = tCb; tCb = null; navigator.vibrate?.([300, 120, 300]); pitido(); cb(); return; }
   navigator.vibrate?.([300, 120, 300, 120, 300]);
   pitido();
   $('#timerTxt').textContent = '¡A trabajar!';
@@ -308,23 +436,91 @@ function siguienteTxt(k) {
   return sig ? `Descanso · sigue: ${sig[1]}` : 'Descanso';
 }
 
+// ---------- Google Calendar vía Apps Script propio (apps-script/Calendario.gs) ----------
+// db.calUrl = URL /exec del script con ?token=…; vive solo en este teléfono, nunca en el repo.
+async function leerCalendario(silencioso = false) {
+  if (!db.calUrl) { calMsg = 'Pega primero el enlace de tu Apps Script (ver apps-script/Calendario.gs).'; render(); return; }
+  try {
+    if (!silencioso) { calMsg = 'Leyendo el calendario…'; render(); }
+    const l = L.lunes(new Date()), l2 = L.sumarDias(l, 7), u = new URL(db.calUrl);
+    u.searchParams.set('desde', new Date(l + 'T00:00').toISOString());
+    u.searchParams.set('hasta', new Date(L.sumarDias(l, 14) + 'T00:00').toISOString());
+    const j = await (await fetch(u)).json();
+    if (j.error) throw new Error(j.error === 'token' ? 'el token no coincide con el del script.' : j.error);
+    const hoy = diaHoy(), desde = db.meta?.inicio > hoy ? db.meta.inicio : hoy;
+    for (const x of [l, l2]) db.agenda[x] = L.slotsDeEventos(j.ev, x, { dias: db.horario.porSemana, min: db.horario.min, desde });
+    db.agendaLeida = new Date().toISOString(); calMsg = ''; guardar();
+  } catch (e) { calMsg = `No se pudo leer el calendario: ${e.message}`; }
+  render();
+}
+
 const acciones = {
   tab: el => { tab = el.dataset.tab; render(); scrollTo(0, 0); },
-  min: el => { form.min = +el.dataset.v; render(); },
-  grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; render(); },
+  min: el => { form.min = +el.dataset.v; form.factor = 1; form.plan = null; render(); },
+  grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; form.factor = 1; form.plan = null; render(); },
   musculo: el => { musculo = musculo === el.dataset.v ? null : el.dataset.v; render(); },
   basico: el => { const d = diaHoy(); db.basicos[d] = { ...db.basicos[d], [el.dataset.v]: el.checked }; guardar(); render(); },
   entrenarGrupo: el => { form.grupos = [el.dataset.v]; tab = 'hoy'; render(); scrollTo(0, 0); },
   empezar: () => {
-    const plan = L.armarRutina(minElegido(), form.grupos);
+    const plan = L.armarRutina(minElegido(), form.grupos, form.factor ?? 1);
     const ultAbs = [...db.sesiones].reverse().flatMap(s => s.series).find(x => x.ex === L.ABS[0].id);
     db.actual = {
       inicio: new Date().toISOString(), min: minElegido(), grupos: [...form.grupos], abs: plan.conAbs, absKg: ultAbs?.kg ?? 10,
+      plan: form.plan, factor: form.factor ?? 1,
       clima: clima && !clima.error ? { txt: clima.txt, lluvia: clima.lluvia } : null,
       ej: plan.ej.map(e => ({ ...e, kgSug: L.sugerirKg(db.sesiones, e) })), hechos: {}, inp: {}, cal: false, elo: false,
     };
     guardar(); pantallaEncendida(); render(); scrollTo(0, 0);
   },
+  planEmpezar: () => {
+    const hp = semanaPlan()?.dias.find(d => d.fecha === diaHoy()), ses = hp?.ses;
+    if (!ses) return;
+    tab = 'hoy';
+    if (ses.tipo === 'fuerza') { form = { min: ses.min, grupos: [...ses.grupos], factor: ses.factor, plan: hp.fecha }; render(); $('#rutina')?.scrollIntoView(); return; }
+    db.actual = { tipo: ses.tipo, ses, inicio: new Date().toISOString(), plan: hp.fecha, paso: -1 };
+    guardar(); pantallaEncendida(); render(); scrollTo(0, 0);
+  },
+  actividad: () => {
+    const min = +$('#actMin').value || 0, h = diaHoy();
+    db.actividad.push({ fecha: h, tipo: $('#actTipo').value, min });
+    if (min >= 15) db.basicos[h] = { ...db.basicos[h], mov: true };
+    guardar(); render();
+  },
+  secuencia: () => {
+    const bs = db.actual.ses.bloques, z = L.zonas(db.perfil);
+    const paso = i => {
+      if (i >= bs.length) { db.actual.paso = -1; guardar(); $('#timer').classList.remove('on'); render(); return; }
+      const b = bs[i], Z = z?.find(x => x.z === b.z);
+      db.actual.paso = i; guardar(); render();
+      timer(b.seg, `${b.txt} · Z${b.z}${Z ? ` ${Z.de}–${Z.a} lpm` : ''}`, () => paso(i + 1));
+    };
+    paso(0);
+  },
+  movilidad: () => timer(1500, 'Movilidad + cuello'),
+  terminarCardio: () => {
+    const a = db.actual, v = id => $(id).value;
+    db.sesiones.push({ fecha: a.inicio, tipo: a.tipo, n: a.ses.n, grupos: [], series: [], abs: false, min: L.minSesion(a.ses),
+      duracionMin: +v('#cMin') || L.minSesion(a.ses), fcProm: +v('#cFc') || null, rpe: +v('#cRpe'), plan: a.plan });
+    db.basicos[diaHoy()] = { ...db.basicos[diaHoy()], mov: true };
+    db.actual = null; tab = 'avance';
+    wake?.release(); guardar(); render(); scrollTo(0, 0);
+  },
+  guardarMeta: () => {
+    const fecha = $('#mFecha').value;
+    if (!fecha || fecha < diaHoy()) { calMsg = ''; alert('Elige una fecha futura para la meta.'); return; }
+    db.meta = { nombre: $('#mNombre').value.trim() || 'Volver a BJJ', inicio: db.meta?.inicio ?? diaHoy(), fecha };
+    guardar(); render();
+  },
+  borrarMeta: () => { if (confirm('¿Borrar la meta y su plan?')) { db.meta = null; guardar(); render(); } },
+  porSemana: el => { db.horario.porSemana = +el.dataset.v; guardar(); render(); },
+  minSes: el => { db.horario.min = +el.dataset.v; guardar(); render(); },
+  diaSem: el => {
+    const d = +el.dataset.v, h = db.horario;
+    h.dias = (h.dias.includes(d) ? h.dias.filter(x => x !== d) : [...h.dias, d]).sort((a, b) => a - b);
+    guardar(); render();
+  },
+  horarioFijo: () => { const l = L.lunes(new Date()); delete db.agenda[l]; delete db.agenda[L.sumarDias(l, 7)]; guardar(); render(); },
+  calendario: () => leerCalendario(),
   fijo: el => { db.actual[el.dataset.v] = true; guardar(); render(); timer(300, el.dataset.v === 'cal' ? 'Calentamiento de articulaciones' : 'Elongar'); },
   serie: el => {
     const a = db.actual, k = el.dataset.k;
@@ -354,16 +550,17 @@ const acciones = {
     });
     if (!series.length && !confirm('No marcaste ninguna serie. ¿Guardar igual?')) return;
     db.sesiones.push({
-      fecha: a.inicio, grupos: a.grupos, min: a.min, duracionMin: Math.round((Date.now() - new Date(a.inicio)) / 60000),
+      fecha: a.inicio, tipo: 'fuerza', plan: a.plan, factor: a.factor, grupos: a.grupos, min: a.min, duracionMin: Math.round((Date.now() - new Date(a.inicio)) / 60000),
       abs: Object.keys(a.hechos).some(k => k.startsWith('abs:')), clima: a.clima, series,
     });
-    db.actual = null; form.grupos = []; tab = 'avance';
+    db.basicos[diaHoy()] = { ...db.basicos[diaHoy()], mov: true };
+    db.actual = null; form = { min: null, grupos: [], factor: 1, plan: null }; tab = 'avance';
     wake?.release(); guardar(); render(); scrollTo(0, 0);
   },
   cancelar: () => { if (confirm('¿Descartar la sesión en curso? Se pierden las series marcadas.')) { db.actual = null; wake?.release(); guardar(); render(); } },
   't-15': () => { tFin -= 15000; tick(); },
   't+15': () => { tFin = Math.max(tFin, Date.now()) + 15000; clearInterval(tInt); tInt = setInterval(tick, 250); tick(); },
-  tfin: () => { clearInterval(tInt); $('#timer').classList.remove('on'); },
+  tfin: () => { tCb = null; clearInterval(tInt); $('#timer').classList.remove('on'); },
   exportar: () => {
     const u = URL.createObjectURL(new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' }));
     const l = Object.assign(document.createElement('a'), { href: u, download: `bam-${new Date().toISOString().slice(0, 10)}.json` });
@@ -380,6 +577,10 @@ document.addEventListener('click', ev => {
 });
 
 document.addEventListener('input', ev => {
+  const c = ev.target.dataset.perfil;
+  if (c) { db.perfil[c] = +String(ev.target.value).replace(',', '.') || null; guardar(); return; }
+  if (ev.target.id === 'calUrl') { db.calUrl = ev.target.value.trim() || null; guardar(); return; }
+  if (ev.target.id === 'hHora') { db.horario.hora = ev.target.value || db.horario.hora; guardar(); return; }
   const { k, f } = ev.target.dataset;
   if (!k || !db.actual) return;
   if (k === 'abskg') db.actual.absKg = ev.target.value;
@@ -389,12 +590,13 @@ document.addEventListener('input', ev => {
 
 document.addEventListener('change', async ev => {
   const act = ev.target.dataset.act;
+  if (ev.target.dataset.perfil || ev.target.id === 'hHora') render();
   if (act === 'exsel') { exSel = ev.target.value; render(); }
   if (act === 'importar' && ev.target.files[0]) {
     try {
       const d = JSON.parse(await ev.target.files[0].text());
       if (!Array.isArray(d.sesiones) || !d.sesiones.every(s => s.fecha && Array.isArray(s.series))) throw new Error();
-      if (confirm(`¿Reemplazar ${db.sesiones.length} sesiones por las ${d.sesiones.length} del respaldo?`)) { db = { sesiones: d.sesiones, actual: null, basicos: d.basicos || {} }; guardar(); render(); }
+      if (confirm(`¿Reemplazar ${db.sesiones.length} sesiones por las ${d.sesiones.length} del respaldo?`)) { db = { ...defaults(), ...d, sesiones: d.sesiones, actual: null }; guardar(); render(); }
     } catch { alert('El archivo no es un respaldo válido de BaM.'); }
   }
 });
@@ -405,4 +607,5 @@ setInterval(() => { const r = $('#reloj'); if (r) r.textContent = transcurrido()
 render();
 pantallaEncendida();
 obtenerClima().then(c => { clima = c; }).catch(() => { clima = { error: true }; }).finally(() => tab !== 'avance' && !db.actual && render());
+if (db.calUrl && !db.actual && Date.now() - new Date(db.agendaLeida || 0) > 6 * 36e5) leerCalendario(true);
 navigator.serviceWorker?.register('sw.js');
