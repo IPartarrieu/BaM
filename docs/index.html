@@ -42,6 +42,13 @@
   .logro { display:flex; gap:10px; align-items:center; padding:8px 0; opacity:.35; } .logro.ok { opacity:1; } .logro b { font-size:24px; }
   select { width:100%; background:var(--panel2); color:var(--txt); border:1px solid #33405f; border-radius:8px; padding:10px; font:inherit; }
   .campo { width:100%; background:var(--panel2); color:var(--txt); border:1px solid #33405f; border-radius:8px; padding:10px; font:inherit; }
+  /* Que nada se salga del recuadro: iOS da a date/time un ancho mínimo propio; flex/grid no encogen sin min-width:0 */
+  input, select, button, textarea { max-width:100%; min-width:0; }
+  input[type=date], input[type=time] { -webkit-appearance:none; appearance:none; display:block; min-height:44px; }
+  .fila > * { min-width:0; } .fila > select { flex:1 1 120px; } .fila > input { flex:1 1 70px; }
+  .card { overflow-wrap:anywhere; } .card .card { background:var(--panel2); padding:12px; margin:8px 0 4px; }
+  .card .card select, .card .card .campo, .card .card .chips button { background:var(--panel); }
+  nav button { padding:10px 2px; font-size:13px; white-space:nowrap; }
   svg text { fill:var(--sub); font:12px system-ui; }
 </style>
 </head>
