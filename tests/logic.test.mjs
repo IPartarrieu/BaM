@@ -136,4 +136,7 @@ for (const i of [0, 1, 2]) {
 assert.equal(L.animoPal(dp, { n: 0, kcal: 0, prot: 0 }, 15).cara, -1);
 assert.equal(L.animoPal(dp, { n: 4, kcal: dp.kcal, prot: dp.prot }).cara, 2);
 assert.equal(L.animoPal(dp, { n: 4, kcal: dp.kcal * 1.3, prot: dp.prot }).cara, -1);
+// Comida pesada: 200 g de cerdo cantonés + 100 g de arroz; lo que no está en la lista o sin gramos no suma
+const pesada = L.macrosDe([{ a: 'cerdo_canton', g: '200' }, { a: 'arroz', g: 100 }, { a: '', g: 50 }, { a: 'pan', g: '' }]);
+assert.deepEqual(pesada, { kcal: 542, prot: 47, txt: 'Cerdo cantonés 200 g, Arroz 100 g' });
 console.log('ok');

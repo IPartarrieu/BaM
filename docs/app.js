@@ -399,9 +399,24 @@ function tarjetaAbs() {
 }
 
 // ---------- Nutrición: objetivo → dieta del día; el cuerpo de Inicio es el Pal que reacciona a lo comido ----------
-let otra = null; // comida que se está registrando como "otra cosa"
+let otra = null; // { k: comida, foto, items: [{a, g}] } mientras se registra "otra cosa"
 const comidoHoy = () => { const c = Object.values(db.comidas[diaHoy()] || {});
   return { n: c.length, kcal: c.reduce((a, x) => a + x.kcal, 0), prot: c.reduce((a, x) => a + x.prot, 0) }; };
+const OPC_ALIM = Object.entries(L.ALIMENTOS).sort((a, b) => a[1][0].localeCompare(b[1][0])).map(([id, a]) => `<option value="${id}">${a[0]}</option>`).join('');
+const formOtra = () => `<div class="card">
+  ${otra.foto ? `<img class="plato" src="${otra.foto}" alt="Foto del plato">` : ''}
+  <label class="btn sec" style="text-align:center">📷 ${otra.foto ? 'Cambiar foto' : 'Sacar foto del plato'}<input type="file" accept="image/*" capture="environment" data-act="fotoComida" hidden></label>
+  <div class="sub" style="margin-top:8px">¿Qué tiene y cuánto pesa?</div>
+  ${otra.items.map((it, i) => `<div class="fila" style="margin-top:6px"><select data-oi="${i}" data-of="a" aria-label="Alimento"><option value="">Alimento…</option>${OPC_ALIM.replace(`value="${it.a}"`, `value="${it.a}" selected`)}</select><input class="campo" style="flex:0 1 90px" data-oi="${i}" data-of="g" value="${it.g}" inputmode="numeric" placeholder="g" aria-label="gramos"></div>`).join('')}
+  <button class="mini" style="background:var(--panel2);margin-top:6px" data-act="masAlim">+ Alimento</button>
+  <div class="sub" style="margin-top:8px">¿No está en la lista? Suma sus kcal y proteína:</div>
+  <div class="fila" style="margin-top:6px"><input class="campo" id="oKcal" inputmode="numeric" placeholder="kcal" aria-label="kcal"><input class="campo" id="oProt" inputmode="numeric" placeholder="proteína g" aria-label="proteína"></div>
+  <div class="fila" style="margin-top:8px"><button class="mini" data-act="guardarOtra" data-v="${otra.k}">Guardar</button><button class="mini" style="background:var(--panel2)" data-act="cancelarOtra">Cancelar</button></div></div>`;
+// Foto chica (480 px, JPEG) para que quepa en localStorage.
+const achicar = f => new Promise((ok, mal) => { const im = new Image(), u = URL.createObjectURL(f);
+  im.onload = () => { const e = Math.min(1, 480 / im.width), c = Object.assign(document.createElement('canvas'), { width: im.width * e, height: im.height * e });
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', .6)); };
+  im.onerror = mal; im.src = u; });
 const miles = n => Math.round(n).toLocaleString('es-CL');
 const TIPO_DIA = { descanso: 'Día de descanso', movilidad: 'Día de movilidad', z2: 'Día de cardio Z2', fuerza: 'Día de fuerza', intervalos: 'Día de intervalos', rounds: 'Día de rounds', deporte: 'Día de partido' };
 
@@ -428,8 +443,8 @@ function vistaNutricion() {
       <div class="sub" style="font-size:11px">Foto: <a href="https://commons.wikimedia.org/wiki/File:${encodeURI(P.cr[2])}" target="_blank" rel="noopener">${P.cr[0]}</a> · ${P.cr[1]}</div></details>
     ${r ? '' : `<details><summary>¿Te falta algo? Otras opciones</summary>${x.alt.map(o => `<button class="alt" data-act="plato" data-k="${x.k}" data-v="${o}">
       <img src="img/platos/${o}.jpg" alt="" loading="lazy"><span>${L.PLATOS[o].n}<small class="sub">${L.PLATOS[o].ing.flat().map(i => L.ALIMENTOS[i][0]).join(', ')}</small></span></button>`).join('')}</details>`}
-    ${r ? `<div class="fila" style="margin-top:6px"><span>✓ ${r.otra ? `Otra cosa: ${r.kcal} kcal, ${r.prot} g proteína` : 'Comí esto'}</span><button class="mini" style="background:var(--panel2)" data-act="comida" data-v="${x.k}">Deshacer</button></div>`
-      : otra === x.k ? `<div class="fila" style="margin-top:6px"><input class="campo" id="oKcal" inputmode="numeric" placeholder="kcal" aria-label="kcal"><input class="campo" id="oProt" inputmode="numeric" placeholder="proteína g" aria-label="proteína"><button class="mini" data-act="guardarOtra" data-v="${x.k}">Guardar</button></div>`
+    ${r ? `${r.foto ? `<img class="plato" src="${r.foto}" alt="Foto de lo que comí">` : ''}<div class="fila" style="margin-top:6px"><span>✓ ${r.otra ? `${r.txt ? r.txt + ': ' : 'Otra cosa: '}${r.kcal} kcal, ${r.prot} g proteína` : 'Comí esto'}</span><button class="mini" style="background:var(--panel2)" data-act="comida" data-v="${x.k}">Deshacer</button></div>`
+      : otra?.k === x.k ? formOtra()
       : `<div class="fila" style="margin-top:6px"><button class="mini" data-act="comida" data-v="${x.k}">✓ Comí esto</button><button class="mini" style="background:var(--panel2)" data-act="otra" data-v="${x.k}">Comí otra cosa</button></div>`}</div>`; };
   const pesos = db.pesos.slice(-5).reverse();
   return `<h1>🍽️ Nutrición</h1>
@@ -661,7 +676,9 @@ const acciones = {
   calendario: () => leerCalendario(),
   objetivo: el => { db.perfil.objetivo = el.dataset.v; guardar(); render(); },
   plato: el => { const h = diaHoy(); (db.platos[h] = db.platos[h] || {})[el.dataset.k] = el.dataset.v; guardar(); render(); },
-  otra: el => { otra = el.dataset.v; render(); $('#oKcal')?.focus(); },
+  otra: el => { otra = { k: el.dataset.v, foto: null, items: [{ a: '', g: '' }] }; render(); },
+  masAlim: () => { otra.items.push({ a: '', g: '' }); render(); },
+  cancelarOtra: () => { otra = null; render(); },
   comida: el => {
     const k = el.dataset.v, h = diaHoy(), dia = db.comidas[h] = db.comidas[h] || {};
     if (dia[k]) delete dia[k];
@@ -669,9 +686,13 @@ const acciones = {
     registrarComida();
   },
   guardarOtra: el => {
-    const h = diaHoy(), kcal = +$('#oKcal').value || 0, prot = +$('#oProt').value || 0;
+    const h = diaHoy(), m = L.macrosDe(otra.items), kcal = m.kcal + (+$('#oKcal').value || 0), prot = m.prot + (+$('#oProt').value || 0);
     if (!kcal) return;
-    (db.comidas[h] = db.comidas[h] || {})[el.dataset.v] = { kcal, prot, otra: true };
+    (db.comidas[h] = db.comidas[h] || {})[el.dataset.v] = { kcal, prot, otra: true, txt: m.txt, foto: otra.foto };
+    // Las fotos pesan: solo se guardan las de la última semana.
+    const corte = L.sumarDias(h, -7);
+    Object.entries(db.comidas).forEach(([f, d]) => f < corte && Object.values(d).forEach(c => delete c.foto));
+    try { guardar(); } catch { delete db.comidas[h][el.dataset.v].foto; }
     otra = null; registrarComida();
   },
   pesar: () => {
@@ -738,6 +759,7 @@ document.addEventListener('click', ev => {
 document.addEventListener('input', ev => {
   const c = ev.target.dataset.perfil;
   if (c) { db.perfil[c] = ev.target.tagName === 'SELECT' ? ev.target.value : +String(ev.target.value).replace(',', '.') || null; guardar(); return; }
+  if (ev.target.dataset.oi) { otra.items[ev.target.dataset.oi][ev.target.dataset.of] = ev.target.value; return; }
   if (ev.target.id === 'calUrl') { db.calUrl = ev.target.value.trim() || null; guardar(); return; }
   const { k, f } = ev.target.dataset;
   if (!k || !db.actual) return;
@@ -751,6 +773,7 @@ document.addEventListener('change', async ev => {
   if (ev.target.dataset.perfil) render();
   if (ev.target.dataset.edit) { const f = ev.target.dataset.f; edit[f] = { ...edit[f], [ev.target.dataset.edit]: ev.target.value }; render(); }
   if (act === 'exsel') { exSel = ev.target.value; render(); }
+  if (act === 'fotoComida' && ev.target.files[0]) { try { otra.foto = await achicar(ev.target.files[0]); } catch {} render(); }
   if (act === 'importar' && ev.target.files[0]) {
     try {
       const d = JSON.parse(await ev.target.files[0].text());
