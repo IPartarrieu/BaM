@@ -28,7 +28,7 @@ function cargar() {
   return { sesiones: [], actual: null, ...defaults() };
 }
 function defaults() {
-  return { basicos: {}, perfil: {}, meta: null, actividad: [], cal: { leido: null, ev: [] }, dias: {}, comidas: {}, pesos: [] };
+  return { basicos: {}, perfil: {}, meta: null, actividad: [], cal: { leido: null, ev: [] }, dias: {}, comidas: {}, platos: {}, pesos: [] };
 }
 const guardar = () => localStorage.setItem(KEY, JSON.stringify(db));
 
@@ -416,13 +416,18 @@ function vistaNutricion() {
       return `<div class="sub" style="margin-top:8px">Ritmo esperado: ${v > 0 ? '+' : ''}${String(v).replace('.', ',')} kg por semana${falta && Math.sign(falta) === Math.sign(v) ? ` · llegas a ${esc(p.pesoMeta)} kg en ~${Math.ceil(falta / v)} semanas` : ''}.</div>`; })() : ''}</div>`;
   if (!d?.kcal) return `<h1>🍽️ Nutrición</h1>
     <div class="card" style="text-align:center">${silueta({ cara: 0, nivel: 0 })}<div style="margin-top:8px">Soy tu Pal. Cuéntame tu objetivo, peso, altura y edad, y te armo la dieta de cada día.</div></div>${objetivo}`;
-  const c = comidoHoy(), a = L.animoPal(d, c, new Date().getHours()), m = L.menu(d, diaHoy());
+  const c = comidoHoy(), a = L.animoPal(d, c, new Date().getHours()), m = L.menu(d, diaHoy(), db.platos[diaHoy()]);
   const barra = (t, v, meta, u, col) => `<div class="sub" style="margin-top:6px">${t} · <b style="color:var(--txt)">${miles(v)}</b> / ${miles(meta)} ${u}</div>
     <div class="barra" style="margin:3px 0"><i style="width:${Math.min(100, v / meta * 100)}%;background:${v > meta * 1.15 ? '#f0b429' : col}"></i></div>`;
-  const comida = x => { const r = hoy[x.k];
+  const comida = x => { const r = hoy[x.k], P = L.PLATOS[x.plato];
     return `<div class="card bloque ${r ? 'ok' : ''}"><h3>${x.nom}${x.k === 'colacion' && hp?.ses ? ' · antes o después de entrenar' : ''}</h3>
+    <img class="plato" src="img/platos/${x.plato}.jpg" alt="${P.n}" loading="lazy"><b>${P.n}</b>
     <ul class="lista">${x.items.map(i => `<li>${i.txt}</li>`).join('')}<li>Verduras a gusto</li></ul>
     <div class="sub">${x.kcal} kcal · P ${x.prot} g · C ${x.cho} g · G ${x.gra} g</div>
+    <details><summary>Preparación</summary><ol class="lista">${P.pasos.map(t => `<li>${t}</li>`).join('')}</ol>
+      <div class="sub" style="font-size:11px">Foto: <a href="https://commons.wikimedia.org/wiki/File:${encodeURI(P.cr[2])}" target="_blank" rel="noopener">${P.cr[0]}</a> · ${P.cr[1]}</div></details>
+    ${r ? '' : `<details><summary>¿Te falta algo? Otras opciones</summary>${x.alt.map(o => `<button class="alt" data-act="plato" data-k="${x.k}" data-v="${o}">
+      <img src="img/platos/${o}.jpg" alt="" loading="lazy"><span>${L.PLATOS[o].n}<small class="sub">${L.PLATOS[o].ing.flat().map(i => L.ALIMENTOS[i][0]).join(', ')}</small></span></button>`).join('')}</details>`}
     ${r ? `<div class="fila" style="margin-top:6px"><span>✓ ${r.otra ? `Otra cosa: ${r.kcal} kcal, ${r.prot} g proteína` : 'Comí esto'}</span><button class="mini" style="background:var(--panel2)" data-act="comida" data-v="${x.k}">Deshacer</button></div>`
       : otra === x.k ? `<div class="fila" style="margin-top:6px"><input class="campo" id="oKcal" inputmode="numeric" placeholder="kcal" aria-label="kcal"><input class="campo" id="oProt" inputmode="numeric" placeholder="proteína g" aria-label="proteína"><button class="mini" data-act="guardarOtra" data-v="${x.k}">Guardar</button></div>`
       : `<div class="fila" style="margin-top:6px"><button class="mini" data-act="comida" data-v="${x.k}">✓ Comí esto</button><button class="mini" style="background:var(--panel2)" data-act="otra" data-v="${x.k}">Comí otra cosa</button></div>`}</div>`; };
@@ -565,8 +570,10 @@ async function moverBloque(f, hora, min) {
     u.searchParams.set('hasta', new Date(L.sumarDias(f, 1) + 'T00:00').toISOString());
     u.searchParams.set('ini', ini.toISOString());
     u.searchParams.set('fin', fin.toISOString());
-    const j = await (await fetch(u)).json();
+    let j; try { j = await (await fetch(u)).json(); } catch { throw new Error('el script falló; revisa que tenga el servicio Calendar API agregado (Servicios +).'); }
     if (j.error) throw new Error(j.error === 'token' ? 'el token no coincide con el del script.' : j.error);
+    // Una implementación anterior a "mover" ignora la acción y devuelve la lista de eventos: no es un éxito.
+    if (!j.ok) throw new Error('el script publicado es una versión antigua. En script.google.com: Implementar → Gestionar implementaciones → editar → Nueva versión.');
     const b = db.cal.ev.find(e => L.esBloque(e.t || '') && L.iso(e.ini) === f);
     if (b) Object.assign(b, { ini: ini.toISOString(), fin: fin.toISOString() });
     else db.cal.ev.push({ t: 'Ejercicio', ini: ini.toISOString(), fin: fin.toISOString() });
@@ -653,11 +660,12 @@ const acciones = {
   },
   calendario: () => leerCalendario(),
   objetivo: el => { db.perfil.objetivo = el.dataset.v; guardar(); render(); },
+  plato: el => { const h = diaHoy(); (db.platos[h] = db.platos[h] || {})[el.dataset.k] = el.dataset.v; guardar(); render(); },
   otra: el => { otra = el.dataset.v; render(); $('#oKcal')?.focus(); },
   comida: el => {
     const k = el.dataset.v, h = diaHoy(), dia = db.comidas[h] = db.comidas[h] || {};
     if (dia[k]) delete dia[k];
-    else { const x = L.menu(nutDe(diaPlan(h)), h).find(x => x.k === k); dia[k] = { kcal: x.kcal, prot: x.prot }; }
+    else { const x = L.menu(nutDe(diaPlan(h)), h, db.platos[h]).find(x => x.k === k); dia[k] = { kcal: x.kcal, prot: x.prot }; }
     registrarComida();
   },
   guardarOtra: el => {

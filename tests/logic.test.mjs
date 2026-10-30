@@ -127,8 +127,9 @@ const dp = L.dieta({ ...yo, objetivo: 'perder' }, 'fuerza'), dm = L.dieta({ ...y
 assert.ok(dp.kcal < dm.kcal && dp.prot > dm.prot && L.dieta({ ...yo, objetivo: 'ganar' }, 'fuerza').kcal > dm.kcal);
 assert.ok(L.dieta({ ...yo, objetivo: 'perder' }, 'descanso').cho < dp.cho);
 assert.ok(L.kgSemana({ ...yo, objetivo: 'perder' }) < 0 && L.kgSemana({ ...yo, objetivo: 'ganar' }) > 0);
-for (const f of ['2026-10-30', '2026-10-31', '2026-11-01']) {
-  const m = L.menu(dp, f), kcal = m.reduce((a, x) => a + x.kcal, 0), prot = m.reduce((a, x) => a + x.prot, 0);
+// Cada combinación (también la de platos alternativos) cuadra con la meta del día
+for (const i of [0, 1, 2]) {
+  const m = L.menu(dp, '2026-10-30', Object.fromEntries(L.COMIDAS.map(([k, , , ops]) => [k, ops[i]]))), f = `combinación ${i}`, kcal = m.reduce((a, x) => a + x.kcal, 0), prot = m.reduce((a, x) => a + x.prot, 0);
   assert.ok(Math.abs(kcal / dp.kcal - 1) < .05 && Math.abs(prot / dp.prot - 1) < .05, f);
 }
 // El Pal: hambre sin registros, feliz al cumplir, triste al pasarse

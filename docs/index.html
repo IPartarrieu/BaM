@@ -51,6 +51,10 @@
   nav button { padding:6px 2px 8px; font-size:12px; white-space:nowrap; } nav button b { display:block; font-size:20px; font-weight:400; }
   .pal-feliz { animation:rebote 1.2s ease-in-out infinite; } @keyframes rebote { 50% { transform:translateY(-6px); } }
   @media (prefers-reduced-motion:reduce) { .pal-feliz { animation:none; } }
+  .plato { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:10px; margin:2px 0 8px; background:var(--panel2); }
+  details summary { color:var(--az); margin-top:8px; cursor:pointer; } details a { color:var(--sub); }
+  button.alt { display:flex; gap:10px; align-items:center; width:100%; text-align:left; background:var(--panel2); color:var(--txt); border:0; border-radius:10px; padding:8px; margin-top:6px; font:inherit; }
+  button.alt img { width:72px; height:54px; object-fit:cover; border-radius:6px; flex:none; } button.alt small { display:block; }
   svg text { fill:var(--sub); font:12px system-ui; }
 </style>
 </head>

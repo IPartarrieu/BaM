@@ -396,17 +396,44 @@ export const kgSemana = p => Math.round(tmb(p) * 1.5 * (OBJETIVOS[p.objetivo].kc
 // Alimentos por 100 g: [nombre, proteína, carbohidrato, grasa, gramos por unidad (se muestra en unidades)].
 export const ALIMENTOS = {
   huevo: ['Huevo', 13, 1, 10, 50], pavo: ['Jamón de pavo', 20, 2, 3], yogur: ['Yogur griego natural', 10, 4, .4], quesillo: ['Quesillo', 12, 3, 4],
-  pollo: ['Pechuga de pollo (cocida)', 31, 0, 4], vacuno: ['Posta o lomo (cocido)', 28, 0, 8], atun: ['Atún al agua', 26, 0, 1], salmon: ['Salmón', 22, 0, 12],
+  pollo: ['Pechuga de pollo (cocida)', 31, 0, 4], vacuno: ['Posta o lomo (cocido)', 28, 0, 8], atun: ['Atún al agua', 26, 0, 1], salmon: ['Salmón', 22, 0, 12], merluza: ['Merluza o reineta', 18, 0, 1.5],
   pan: ['Pan integral', 9, 43, 3], avena: ['Avena', 13, 66, 7], arroz: ['Arroz (cocido)', 2.7, 28, .3], papa: ['Papa (cocida)', 2, 20, .1],
-  fideos: ['Fideos (cocidos)', 5.8, 31, .9], porotos: ['Porotos o lentejas (cocidos)', 9, 20, .5], platano: ['Plátano', 1.1, 23, .3, 120],
+  fideos: ['Fideos (cocidos)', 5.8, 31, .9], porotos: ['Porotos o lentejas (cocidos)', 9, 20, .5], platano: ['Plátano (1 mediano ≈ 120 g)', 1.1, 23, .3],
   palta: ['Palta', 2, 9, 15], aceite: ['Aceite de oliva', 0, 0, 100], mani: ['Maní sin sal', 26, 16, 49], nueces: ['Nueces', 15, 14, 65],
 };
-// [clave, nombre, fracción del día, plantillas [proteínas, carbohidrato, grasa]]; la plantilla rota cada día.
+// Platos: ing = [proteínas, carbohidrato, grasa]; los gramos salen de porciones(). La foto es img/platos/<id>.jpg (Wikimedia Commons, cr = autor · licencia · fuente).
+export const PLATOS = {
+  revuelto: { n: 'Huevos revueltos con pavo y pan tostado', ing: [['pavo'], 'pan', 'huevo'], cr: ['HaJunkiyada', 'CC BY-SA 4.0', 'Liat_Portal_for_Foodie_Disorder_-_Israeli_Breakfast_in_SF.jpg'],
+    pasos: ['Bate los huevos con sal y pimienta.', 'Cocínalos a fuego bajo revolviendo hasta que cuajen; agrega el pavo picado al final.', 'Sirve con el pan tostado y tomate.'] },
+  avena: { n: 'Avena con yogur griego y nueces', ing: [['yogur'], 'avena', 'nueces'], cr: ['Shisma', 'CC BY 4.0', 'Banana_blueberry_oatmeal.jpg'],
+    pasos: ['Cuece la avena 3–4 minutos en agua (o déjala remojando la noche anterior).', 'Sirve con el yogur encima.', 'Termina con las nueces picadas y canela; fruta si quieres.'] },
+  tostada_huevo: { n: 'Tostadas con huevo, pavo y quesillo', ing: [['pavo', 'quesillo'], 'pan', 'huevo'], cr: ['Pequeño mar', 'CC BY-SA 4.0', 'Avocado_toast.jpg'],
+    pasos: ['Tuesta el pan.', 'Cuece los huevos 7 minutos (o a la plancha).', 'Arma: pavo, quesillo en láminas, tomate y el huevo encima.'] },
+  pollo_arroz: { n: 'Pollo a la plancha con arroz', ing: [['pollo'], 'arroz', 'aceite'], cr: ['T.Tseng', 'CC BY 2.0', 'Hainanese_Chicken_Rice,_with_asparagus.jpg'],
+    pasos: ['Cuece el arroz (1 taza de arroz por 2 de agua, 15–18 min).', 'Aliña la pechuga con sal, ajo y comino; plancha 5–6 min por lado.', 'Sirve con verduras y el aceite crudo encima.'] },
+  carne_papas: { n: 'Carne a la plancha con papas', ing: [['vacuno'], 'papa', 'aceite'], cr: ['HaJunkiyada', 'CC BY-SA 4.0', 'Liat_Portal_for_Foodie_Disorder_-_Homemade_steak_with_roasted_potatoes.jpg'],
+    pasos: ['Cuece las papas con cáscara 20 min (o al horno en cubos con el aceite).', 'Sella la carne en sartén muy caliente 3–4 min por lado y déjala reposar.', 'Acompaña con ensalada.'] },
+  porotos_atun: { n: 'Ensalada de porotos con atún', ing: [['atun'], 'porotos', 'aceite'], cr: ['Katrin Gilger', 'CC BY-SA 2.0', 'Insalata_di_Fagioli_e_Tonno_–_Bohnensalat_mit_Thunfisch_(7327273414).jpg'],
+    pasos: ['Enjuaga los porotos o lentejas cocidos (sirven los de tarro).', 'Mezcla con el atún escurrido, cebolla morada, tomate y cilantro.', 'Aliña con el aceite, limón y sal.'] },
+  yogur_platano: { n: 'Yogur con plátano y maní', ing: [['yogur'], 'platano', 'mani'], cr: ['Daderot', 'CC0', 'Yogurt_with_raisins_and_banana_-_Massachusetts.jpg'],
+    pasos: ['Sirve el yogur en un pote.', 'Agrega el plátano en rodajas y el maní encima.'] },
+  pan_quesillo: { n: 'Pan integral con quesillo y palta', ing: [['quesillo'], 'pan', 'palta'], cr: ['Jami430', 'CC BY-SA 4.0', 'Avocado_toast_in_Stockholm,_Sweden.jpg'],
+    pasos: ['Tuesta el pan.', 'Unta la palta y agrega el quesillo en láminas con tomate.'] },
+  sandwich_atun: { n: 'Sándwich de atún', ing: [['atun'], 'pan', 'palta'], cr: ['jeffreyw', 'CC BY 2.0', 'Tuna_salad_sandwich_(1).jpg'],
+    pasos: ['Mezcla el atún escurrido con la palta molida, limón y sal.', 'Arma el sándwich con lechuga y tomate.'] },
+  pescado_papas: { n: 'Pescado al horno con papas y palta', ing: [['merluza'], 'papa', 'palta'], cr: ['Prayitno', 'CC BY 2.0', 'Grilled_Salmon_(15950616571).jpg'],
+    pasos: ['Hornea el pescado a 200 °C por 12–15 min con sal, limón y eneldo (si usas salmón, omite la palta: ya trae la grasa).', 'Cuece las papas 20 min.', 'Sirve con la palta y ensalada verde.'] },
+  pollo_fideos: { n: 'Fideos con pollo salteado', ing: [['pollo'], 'fideos', 'aceite'], cr: ['Jpatokal', 'CC BY-SA 4.0', 'Good_Meat_Cultivated_Chicken_pasta_dish.jpg'],
+    pasos: ['Cuece los fideos al dente.', 'Saltea el pollo en tiras con el aceite, ajo y verduras (porotos verdes, zapallo italiano).', 'Mezcla todo y ajusta con sal y pimienta.'] },
+  tortilla: { n: 'Tortilla de papas con pavo', ing: [['pavo'], 'papa', 'huevo'], cr: ['Kent Wang', 'CC BY-SA 2.0', 'Tortilla_de_patata_-_San_Sebastián.jpg'],
+    pasos: ['Cuece las papas en láminas finas (o usa papas cocidas del almuerzo).', 'Bate los huevos, agrega papas y pavo picado.', 'Cuaja en sartén antiadherente a fuego bajo, 5 min por lado (da vuelta con un plato).'] },
+};
+// [clave, nombre, fracción del día, platos]; rota cada día y se puede cambiar por otro si faltan ingredientes.
 export const COMIDAS = [
-  ['desayuno', 'Desayuno', .25, [[['huevo', 'pavo'], 'pan', 'palta'], [['yogur'], 'avena', 'nueces']]],
-  ['almuerzo', 'Almuerzo', .35, [[['pollo'], 'arroz', 'aceite'], [['vacuno'], 'papa', 'aceite'], [['atun'], 'porotos', 'aceite']]],
-  ['colacion', 'Colación', .15, [[['yogur'], 'platano', 'mani'], [['quesillo'], 'pan', 'palta']]],
-  ['cena', 'Cena', .25, [[['salmon'], 'papa', 'palta'], [['pollo'], 'fideos', 'aceite'], [['vacuno'], 'arroz', 'aceite']]],
+  ['desayuno', 'Desayuno', .25, ['revuelto', 'avena', 'tostada_huevo']],
+  ['almuerzo', 'Almuerzo', .35, ['pollo_arroz', 'carne_papas', 'porotos_atun']],
+  ['colacion', 'Colación', .15, ['yogur_platano', 'pan_quesillo', 'sandwich_atun']],
+  ['cena', 'Cena', .25, ['pescado_papas', 'pollo_fideos', 'tortilla']],
 ];
 const kcalDe = (p, c, g) => Math.round(p * 4 + c * 4 + g * 9);
 // Gramos de cada alimento para llegar a {prot, cho, gra}: cada grupo cubre su macro descontando lo que aportan
@@ -424,9 +451,13 @@ export function porciones(obj, [prots, carb, gras]) {
   const tot = k => Math.round(items.reduce((a, x) => a + x.gr * m(x.id, k), 0));
   return { items, prot: tot(0), cho: tot(1), gra: tot(2), kcal: kcalDe(tot(0), tot(1), tot(2)) };
 }
-export function menu(d, fecha) {
+// elegidos = { comida: plato } que el usuario cambió hoy; alt = los otros platos de esa comida.
+export function menu(d, fecha, elegidos = {}) {
   const n = Math.round(dia(fecha) / 864e5);
-  return COMIDAS.map(([k, nom, s, ops]) => ({ k, nom, ...porciones({ prot: d.prot * s, cho: d.cho * s, gra: d.gra * s }, ops[n % ops.length]) }));
+  return COMIDAS.map(([k, nom, s, ops]) => {
+    const plato = ops.includes(elegidos[k]) ? elegidos[k] : ops[n % ops.length];
+    return { k, nom, plato, alt: ops.filter(o => o !== plato), ...porciones({ prot: d.prot * s, cho: d.cho * s, gra: d.gra * s }, PLATOS[plato].ing) };
+  });
 }
 
 // El Pal (la silueta de Inicio) reacciona a lo comido. cara: −1 triste, 0 neutro, 1 contento, 2 feliz.
