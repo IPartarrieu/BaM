@@ -1,4 +1,5 @@
 import * as L from './logic.js';
+import * as IA from './ia.js';
 
 const KEY = 'bam-v1';
 const COORD_DEF = [-36.83, -73.05]; // Concepción, si no hay GPS
@@ -14,7 +15,8 @@ let clima = null;
 let exSel = null;
 let audio = null, wake = null;
 let calMsg = '';
-let editando = null; // fecha del editor abierto en Inicio/Plan
+let editando = null; // fecha del editor abierto en Entrenamiento
+let lado = false, preg = null; // panel lateral abierto; { q, a, cargando } de la pregunta a Claude
 const edit = {}; // cambios sin confirmar por fecha: { item, hora, min }
 
 function cargar() {
@@ -75,8 +77,8 @@ const nombreGrupo = g => `${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre}`;
 
 function tarjetaMeta() {
   const m = db.meta, est = m && semana().est;
-  if (!m) return `<div class="card"><h2>🎯 Tu meta</h2><div class="sub">Define una fecha y te armo el plan semana a semana.</div><button class="btn" data-act="tab" data-tab="plan">Crear mi plan</button></div>`;
-  if (est.fin) return `<div class="card" style="border:2px solid var(--ac)"><h2>¡Llegó el día! Inscríbete en las clases de BJJ 🥋</h2><button class="btn" data-act="tab" data-tab="plan">Crear una meta nueva</button></div>`;
+  if (!m) return '';
+  if (est.fin) return `<div class="card" style="border:2px solid var(--ac)"><h2>¡Llegó el día! Inscríbete en las clases de BJJ 🥋</h2><div class="sub">Crea una meta nueva más abajo.</div></div>`;
   return `<div class="card"><h2>🎯 ${esc(m.nombre)} · faltan ${est.dias} días</h2>
     <div class="sub">Semana ${est.semana + 1} de ${est.total} · Fase ${L.FASES[est.fase].n}</div>
     <div class="barra"><i style="width:${(est.semana + 1) / est.total * 100}%"></i></div><div class="sub">${L.FASES[est.fase].obj}</div></div>`;
@@ -150,16 +152,8 @@ function vistaInicio() {
   const puntos = Array.from({ length: 28 }, (_, i) => { const f = L.sumarDias(hoy, i - 27);
     return `<span style="width:10px;height:10px;border-radius:50%;background:${L.diaCumplido(db.basicos[f]) ? 'var(--ok)' : 'var(--panel2)'};${f === hoy ? 'border:2px solid #fff;box-sizing:border-box' : ''}"></span>`; }).join('');
   const deHoy = db.actividad.filter(a => a.fecha === hoy);
-  const stat = (v, t) => `<div><div style="font-size:24px;font-weight:700">${v}</div><div class="sub">${t}</div></div>`;
-  const M = musculo && L.MUSCULOS[musculo];
-  const info = !M ? '<div class="sub" style="text-align:center">Toca un músculo para ver su grupo y qué ejercicios lo trabajan.</div>' :
-    `<h3 style="color:${COLOR[M[1]]}">${M[0]}</h3><div class="sub">Grupo: ${nombreGrupo(M[1])}</div>
-     <ul class="lista">${L.ejerciciosDe(musculo).map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${L.GRUPOS[e.g].nombre}</li>`).join('')}</ul>
-     ${M ? `<button class="btn sec" data-act="entrenarGrupo" data-v="${M[1]}">Entrenar ${L.GRUPOS[M[1]].nombre}</button>` : ''}`;
   return `<div class="sub" style="letter-spacing:.04em"><b style="color:var(--ac)">BaM</b> · Becoming a Machine</div>
   <h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
-  ${new Date().getDay() === 1 ? tarjetaLunes() : ''}
-  ${tarjetaMeta()}${tarjetaHoy(hoy)}${tarjetaManana()}
   <div class="card"><h2>Metas de hoy <span class="sub">🔥 ${racha.actual} días</span></h2>
     <div class="sub">mejor racha ${racha.mejor} · cuenta si te mueves y cumples 4 de 6</div>
     ${metas.map(([k, t]) => `<label class="switch" style="padding:8px 0"><span>${t}</span><input type="checkbox" data-act="basico" data-v="${k}" ${b[k] ? 'checked' : ''}></label>`).join('')}
@@ -168,19 +162,23 @@ function vistaInicio() {
     <div class="fila"><select id="actTipo" style="flex:2">${ACTIVIDADES.map(a => `<option>${a}</option>`).join('')}</select>
     <input id="actMin" inputmode="numeric" value="30" aria-label="minutos" style="flex:1;min-width:60px" class="campo"><button class="mini" data-act="actividad">Registrar</button></div>
     ${deHoy.map(a => `<div class="sub">${esc(a.tipo)} · ${esc(a.min)} min</div>`).join('')}</div>
-  <div class="card"><h2>Nutrición de hoy</h2>${nut
-    ? `<div class="fila" style="justify-content:space-around;text-align:center">${nut.kcal ? stat(nut.kcal.toLocaleString('es-CL'), 'kcal') : ''}${stat(nut.prot + ' g', 'proteína')}${stat(nut.cho + ' g', 'carbohidrato')}${stat(String(nut.agua).replace(".", ",") + ' L', 'agua')}</div><div class="sub" style="margin-top:8px">${nut.tip}</div>`
-    : '<div class="sub">Ingresa tu peso para calcular proteína, carbohidrato y agua.</div>'}
-    <button class="btn sec" data-act="tab" data-tab="nutricion">🍽️ ${nut?.kcal ? 'Ver mi dieta de hoy' : 'Armar mi dieta'}</button></div>
-  <div class="card"><h2>Mapa muscular</h2>${silueta()}
+  <button class="btn sec" data-act="anotarComida">🍽️ Registrar comida</button>
+  <button class="btn" data-act="tab" data-tab="hoy">🥋 Ir a entrenar${hp?.ses && !hp.hecho ? ` · ${hp.ses.n} ${hp.hora}` : ''}</button>`;
+}
+
+function cardMapa() {
+  const M = musculo && L.MUSCULOS[musculo];
+  const info = !M ? '<div class="sub" style="text-align:center">Toca un músculo para ver su grupo y qué ejercicios lo trabajan.</div>' :
+    `<h3 style="color:${COLOR[M[1]]}">${M[0]}</h3><div class="sub">Grupo: ${nombreGrupo(M[1])}</div>
+     <ul class="lista">${L.ejerciciosDe(musculo).map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${L.GRUPOS[e.g].nombre}</li>`).join('')}</ul>
+     <button class="btn sec" data-act="entrenarGrupo" data-v="${M[1]}">Entrenar ${L.GRUPOS[M[1]].nombre}</button>`;
+  return `<div class="card"><h2>Mapa muscular</h2>${silueta()}
     <div class="fila sub" style="justify-content:center;gap:12px;margin:6px 0 10px">${Object.entries(COLOR).filter(([g]) => g !== 'potencia').map(([g, c]) => `<span><b style="color:${c}">●</b> ${L.GRUPOS[g].nombre.split(' ')[0]}</span>`).join('')}</div>
-    ${info}</div>
-  <button class="btn" data-act="tab" data-tab="hoy">🥋 Ir a entrenar</button>`;
+    ${info}</div>`;
 }
 
 function tarjetaLunes() {
   const r = L.resumenAnterior(db.sesiones), dif = r.sesiones - r.antes;
-  const stat = (v, t) => `<div><div style="font-size:24px;font-weight:700">${v}</div><div class="sub">${t}</div></div>`;
   return `<div class="card" style="border:2px solid var(--ac)"><h2>📅 Tu semana pasada</h2>
     <div class="fila" style="justify-content:space-around;text-align:center">${stat(`${r.sesiones}/${L.META}`, 'sesiones')}${stat(r.minutos, 'minutos')}${stat(r.series, 'series')}</div>
     <div class="sub" style="margin:8px 0">${dif > 0 ? `▲ ${dif} ${dif > 1 ? 'sesiones' : 'sesión'} más que la semana anterior` : dif < 0 ? `▼ ${-dif} menos que la semana anterior` : 'Igual que la semana anterior'}
@@ -252,13 +250,13 @@ function silueta(pal) {
 function vistaHoy() {
   const r = L.resumenSemana(db.sesiones), min = minElegido();
   const plan = form.grupos.length ? L.armarRutina(min, form.grupos, form.factor ?? 1) : null;
-  const hp = diaPlan(diaHoy());
-  const delPlan = hp?.ses && !hp.hecho ? `<div class="card" style="border:2px solid var(--ac)"><h2>Sesión del plan</h2><div>${hp.ses.i} ${hp.ses.n} · ${hp.min} min</div><button class="btn" data-act="planEmpezar">Empezar</button></div>` : '';
+  const hoy = diaHoy(), conMeta = db.meta && !semana().est.fin;
   const climaHtml = !clima ? '<span class="sub">Consultando el clima…</span>' : clima.error ? '<span class="sub">Sin datos de clima (sin conexión)</span>' :
     `<div class="fila"><span style="font-size:38px">${clima.i}</span><div><b>${clima.txt}, ${clima.temp} °C</b>
      <div class="sub">Lluvia ${clima.prob}% · ${clima.lluvia ? 'día de lluvia: probablemente haya menos tiempo, prioriza lo esencial' : 'buen día: puede que haya más tiempo para entrenar'}</div></div></div>`;
-  return `<h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
-  ${delPlan}<h2 style="margin-top:16px">${delPlan ? 'O entrena libre' : 'Entrena libre'}</h2>
+  return `<h1>🥋 Entrenamiento</h1>
+  ${new Date().getDay() === 1 ? tarjetaLunes() : ''}${tarjetaMeta()}${tarjetaHoy(hoy)}${tarjetaManana()}${conMeta ? '' : vistaMeta()}
+  <h2 style="margin-top:16px">Entrena libre</h2>
   <div class="card">${climaHtml}</div>
   <div class="card"><h2>Semana: ${r.sesiones}/${L.META} sesiones</h2><div class="barra"><i style="width:${Math.min(100, r.sesiones / L.META * 100)}%"></i></div>
     <div class="sub">${r.pendientes.length ? 'Falta: ' + r.pendientes.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' · ') : '¡Todos los grupos trabajados esta semana!'}</div></div>
@@ -267,7 +265,8 @@ function vistaHoy() {
     ${clima?.min ? `<div class="sub" style="margin-top:6px">Sugerido por el clima: ${clima.min} min</div>` : ''}</div>
   <div class="card"><h2>¿Qué grupo muscular?</h2><div class="grupos">
     ${Object.entries(L.GRUPOS).map(([g, G]) => `<button data-act="grupo" data-v="${g}" class="${form.grupos.includes(g) ? 'sel' : ''}">${G.icono} ${G.nombre}<span class="tag ${r.grupos.has(g) ? '' : 'pend'}">${r.grupos.has(g) ? '✓ hecho esta semana' : 'pendiente'}</span></button>`).join('')}</div></div>
-  ${plan ? vistaPlan(plan) : '<div class="sub" style="text-align:center">Elige uno o más grupos para armar la rutina.</div>'}`;
+  ${plan ? vistaPlan(plan) : '<div class="sub" style="text-align:center">Elige uno o más grupos para armar la rutina.</div>'}
+  ${cardMapa()}${conMeta ? `<h2 style="margin-top:16px">Plan</h2>${vistaMeta()}` : ''}`;
 }
 
 function vistaPlan(plan) {
@@ -318,28 +317,16 @@ function vistaCardio() {
 
 const chip = (act, v, txt, sel) => `<button data-act="${act}" data-v="${v}" class="${sel ? 'sel' : ''}">${txt}</button>`;
 function vistaMeta() {
-  const m = db.meta, p = db.perfil, sp = semana(), zs = L.zonas(p);
-  const campo = (c, t, ph = '') => `<label class="sub" style="display:block;margin-top:6px">${t}<input class="campo" inputmode="numeric" data-perfil="${c}" value="${esc(p[c] ?? '')}" placeholder="${ph}"></label>`;
+  const m = db.meta, sp = semana();
   const linea = !m ? '' : Array.from({ length: L.estadoMeta(m, m.fecha).total }, (_, s) => {
     const act = sp && !sp.est.fin && sp.est.semana === s;
     return `<div class="sub" style="padding:4px 8px;border-left:3px solid ${act ? 'var(--ac)' : 'transparent'};${act ? 'color:var(--txt);font-weight:700' : ''}">Sem ${s + 1} · ${fechaTxt(L.sumarDias(L.lunes(m.inicio), s * 7), { day: 'numeric', month: 'short' })} · ${L.FASES[L.faseDe(s, L.estadoMeta(m, m.fecha).total)].n}</div>`;
   }).join('');
-  return `<h1>🎯 Plan</h1>
-  <div class="card"><h2>🎯 Tu meta</h2>
+  return `<div class="card"><h2>🎯 Tu meta</h2>${m ? '' : '<div class="sub">Define una fecha y te armo el plan semana a semana.</div>'}
     <input class="campo" id="mNombre" value="${esc(m?.nombre ?? 'Volver a BJJ')}" aria-label="nombre de la meta">
     <input class="campo" id="mFecha" type="date" value="${m?.fecha ?? L.sumarDias(diaHoy(), 28)}" aria-label="fecha de la meta" style="margin-top:6px">
     <button class="btn" data-act="guardarMeta">Guardar meta</button>
     ${m ? `<div style="margin-top:10px">${linea}</div><button class="mini" style="background:var(--panel2);margin-top:8px" data-act="borrarMeta">Borrar meta</button>` : ''}</div>
-  <div class="card"><h2>Perfil</h2>${campo('edad', 'Edad')}${campo('peso', 'Peso (kg)')}${campo('fcRep', 'FC en reposo')}${campo('fcMax', 'FC máxima (opcional)', p.edad ? `estimada ${L.fcMax(p)}` : '')}
-    ${zs ? `<table style="width:100%;margin-top:10px;font-size:14px;border-collapse:collapse">${zs.map(z => `<tr><td>Z${z.z}</td><td>${z.n}</td><td>${z.de}–${z.a} lpm</td><td class="sub">${z.t}</td></tr>`).join('')}</table>`
-      : '<div class="sub" style="margin-top:8px">Con edad y FC en reposo calculo tus zonas (Karvonen).</div>'}
-    <div class="sub" style="margin-top:8px">FC en reposo: mídela al despertar, acostado, 3 días seguidos.</div></div>
-  <div class="card"><h2>Google Calendar</h2>
-    <input class="campo" id="calUrl" type="url" placeholder="Enlace del Apps Script (…/exec?token=…)" value="${esc(db.calUrl ?? '')}" aria-label="enlace del calendario">
-    <button class="btn sec" data-act="calendario">📅 Leer mi Google Calendar</button>
-    <div class="sub" style="margin-top:6px">Todo evento de tu calendario es fijo salvo el bloque 'Ejercicio': la app lo mueve al confirmar cada día.</div>
-    ${calMsg ? `<div style="margin-top:8px;color:#f0b429">${esc(calMsg)}</div>` : ''}
-    ${db.cal.leido ? `<div class="sub" style="margin-top:8px">Leído: ${fechaTxt(db.cal.leido, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>` : ''}</div>
   ${m ? cardMetas(sp) + cardDias(sp) : ''}`;
 }
 
@@ -399,19 +386,19 @@ function tarjetaAbs() {
 }
 
 // ---------- Nutrición: objetivo → dieta del día; el cuerpo de Inicio es el Pal que reacciona a lo comido ----------
-let otra = null; // { k: comida, foto, items: [{a, g}] } mientras se registra "otra cosa"
+let otra = null; // { k: comida, foto, items: [{t, g}], msg, cargando } mientras se registra "otra cosa"
 const comidoHoy = () => { const c = Object.values(db.comidas[diaHoy()] || {});
   return { n: c.length, kcal: c.reduce((a, x) => a + x.kcal, 0), prot: c.reduce((a, x) => a + x.prot, 0) }; };
-const OPC_ALIM = Object.entries(L.ALIMENTOS).sort((a, b) => a[1][0].localeCompare(b[1][0])).map(([id, a]) => `<option value="${id}">${a[0]}</option>`).join('');
 const formOtra = () => `<div class="card">
   ${otra.foto ? `<img class="plato" src="${otra.foto}" alt="Foto del plato">` : ''}
   <label class="btn sec" style="text-align:center">📷 ${otra.foto ? 'Cambiar foto' : 'Sacar foto del plato'}<input type="file" accept="image/*" capture="environment" data-act="fotoComida" hidden></label>
-  <div class="sub" style="margin-top:8px">¿Qué tiene y cuánto pesa?</div>
-  ${otra.items.map((it, i) => `<div class="fila" style="margin-top:6px"><select data-oi="${i}" data-of="a" aria-label="Alimento"><option value="">Alimento…</option>${OPC_ALIM.replace(`value="${it.a}"`, `value="${it.a}" selected`)}</select><input class="campo" style="flex:0 1 90px" data-oi="${i}" data-of="g" value="${it.g}" inputmode="numeric" placeholder="g" aria-label="gramos"></div>`).join('')}
-  <button class="mini" style="background:var(--panel2);margin-top:6px" data-act="masAlim">+ Alimento</button>
-  <div class="sub" style="margin-top:8px">¿No está en la lista? Suma sus kcal y proteína:</div>
+  <div class="sub" style="margin-top:8px">¿Qué comiste y cuánto pesaba?</div>
+  ${otra.items.map((it, i) => `<div class="fila" style="margin-top:6px"><input class="campo" style="flex:3 1 140px" data-oi="${i}" data-of="t" value="${esc(it.t)}" placeholder="Ej.: cerdo cantonés" aria-label="qué comiste"><input class="campo" style="flex:1 1 70px" data-oi="${i}" data-of="g" value="${esc(it.g)}" inputmode="numeric" placeholder="g" aria-label="gramos"></div>`).join('')}
+  <button class="mini" style="background:var(--panel2);margin-top:6px" data-act="masAlim">+ Otro alimento</button>
+  <div class="sub" style="margin-top:8px">${IA.clave() ? 'Claude calcula las calorías con la foto y lo que escribas. Si ya las sabes, anótalas:' : 'Anota las calorías y la proteína (o conecta Claude en ☰ para que las calcule):'}</div>
   <div class="fila" style="margin-top:6px"><input class="campo" id="oKcal" inputmode="numeric" placeholder="kcal" aria-label="kcal"><input class="campo" id="oProt" inputmode="numeric" placeholder="proteína g" aria-label="proteína"></div>
-  <div class="fila" style="margin-top:8px"><button class="mini" data-act="guardarOtra" data-v="${otra.k}">Guardar</button><button class="mini" style="background:var(--panel2)" data-act="cancelarOtra">Cancelar</button></div></div>`;
+  ${otra.msg ? `<div style="margin-top:8px;color:#f0b429">${esc(otra.msg)}</div>` : ''}
+  <div class="fila" style="margin-top:8px"><button class="mini" data-act="guardarOtra" data-v="${otra.k}" ${otra.cargando ? 'disabled' : ''}>${otra.cargando ? 'Analizando…' : 'Guardar'}</button><button class="mini" style="background:var(--panel2)" data-act="cancelarOtra">Cancelar</button></div></div>`;
 // Foto chica (480 px, JPEG) para que quepa en localStorage.
 const achicar = f => new Promise((ok, mal) => { const im = new Image(), u = URL.createObjectURL(f);
   im.onload = () => { const e = Math.min(1, 480 / im.width), c = Object.assign(document.createElement('canvas'), { width: im.width * e, height: im.height * e });
@@ -425,12 +412,11 @@ function vistaNutricion() {
   const campo = (c, t) => `<label class="sub" style="flex:1 1 90px">${t}<input class="campo" inputmode="decimal" data-perfil="${c}" value="${esc(p[c] ?? '')}"></label>`;
   const objetivo = `<div class="card"><h2>Tu objetivo</h2>
     <div class="fila chips">${Object.entries(L.OBJETIVOS).map(([k, O]) => chip('objetivo', k, `${O.i} ${O.n}`, p.objetivo === k)).join('')}</div>
-    <div class="fila" style="margin-top:8px">${campo('peso', 'Peso (kg)')}${campo('pesoMeta', 'Peso meta')}${campo('altura', 'Altura (cm)')}${campo('edad', 'Edad')}
-      <label class="sub" style="flex:1 1 90px">Sexo<select data-perfil="sexo"><option value="h">Hombre</option><option value="m" ${p.sexo === 'm' ? 'selected' : ''}>Mujer</option></select></label></div>
+    <div class="fila" style="margin-top:8px">${campo('pesoMeta', 'Peso meta (kg)')}</div>
     ${d?.kcal && p.objetivo !== 'mantener' ? (() => { const v = L.kgSemana(p), falta = +p.pesoMeta ? p.pesoMeta - p.peso : 0;
       return `<div class="sub" style="margin-top:8px">Ritmo esperado: ${v > 0 ? '+' : ''}${String(v).replace('.', ',')} kg por semana${falta && Math.sign(falta) === Math.sign(v) ? ` · llegas a ${esc(p.pesoMeta)} kg en ~${Math.ceil(falta / v)} semanas` : ''}.</div>`; })() : ''}</div>`;
   if (!d?.kcal) return `<h1>🍽️ Nutrición</h1>
-    <div class="card" style="text-align:center">${silueta({ cara: 0, nivel: 0 })}<div style="margin-top:8px">Soy tu Pal. Cuéntame tu objetivo, peso, altura y edad, y te armo la dieta de cada día.</div></div>${objetivo}`;
+    <div class="card" style="text-align:center">${silueta({ cara: 0, nivel: 0 })}<div style="margin-top:8px">Soy tu Pal. Completa tus datos en ☰ (arriba a la derecha), elige tu objetivo y te armo la dieta de cada día.</div></div>${objetivo}`;
   const c = comidoHoy(), a = L.animoPal(d, c, new Date().getHours()), m = L.menu(d, diaHoy(), db.platos[diaHoy()]);
   const barra = (t, v, meta, u, col) => `<div class="sub" style="margin-top:6px">${t} · <b style="color:var(--txt)">${miles(v)}</b> / ${miles(meta)} ${u}</div>
     <div class="barra" style="margin:3px 0"><i style="width:${Math.min(100, v / meta * 100)}%;background:${v > meta * 1.15 ? '#f0b429' : col}"></i></div>`;
@@ -443,7 +429,7 @@ function vistaNutricion() {
       <div class="sub" style="font-size:11px">Foto: <a href="https://commons.wikimedia.org/wiki/File:${encodeURI(P.cr[2])}" target="_blank" rel="noopener">${P.cr[0]}</a> · ${P.cr[1]}</div></details>
     ${r ? '' : `<details><summary>¿Te falta algo? Otras opciones</summary>${x.alt.map(o => `<button class="alt" data-act="plato" data-k="${x.k}" data-v="${o}">
       <img src="img/platos/${o}.jpg" alt="" loading="lazy"><span>${L.PLATOS[o].n}<small class="sub">${L.PLATOS[o].ing.flat().map(i => L.ALIMENTOS[i][0]).join(', ')}</small></span></button>`).join('')}</details>`}
-    ${r ? `${r.foto ? `<img class="plato" src="${r.foto}" alt="Foto de lo que comí">` : ''}<div class="fila" style="margin-top:6px"><span>✓ ${r.otra ? `${r.txt ? r.txt + ': ' : 'Otra cosa: '}${r.kcal} kcal, ${r.prot} g proteína` : 'Comí esto'}</span><button class="mini" style="background:var(--panel2)" data-act="comida" data-v="${x.k}">Deshacer</button></div>`
+    ${r ? `${r.foto ? `<img class="plato" src="${r.foto}" alt="Foto de lo que comí">` : ''}<div class="fila" style="margin-top:6px"><span>✓ ${r.otra ? `${r.txt ? esc(r.txt) + ': ' : 'Otra cosa: '}${r.kcal} kcal, ${r.prot} g proteína` : 'Comí esto'}</span>${r.nota ? `<span class="sub" style="flex-basis:100%">${esc(r.nota)}</span>` : ''}<span></span><button class="mini" style="background:var(--panel2)" data-act="comida" data-v="${x.k}">Deshacer</button></div>`
       : otra?.k === x.k ? formOtra()
       : `<div class="fila" style="margin-top:6px"><button class="mini" data-act="comida" data-v="${x.k}">✓ Comí esto</button><button class="mini" style="background:var(--panel2)" data-act="otra" data-v="${x.k}">Comí otra cosa</button></div>`}</div>`; };
   const pesos = db.pesos.slice(-5).reverse();
@@ -462,6 +448,40 @@ function vistaNutricion() {
 }
 
 const ICONO = { z2: '🫁', intervalos: '⏱️', rounds: '🥋', movilidad: '🧘' };
+// ---------- panel lateral: datos personales y conexiones ----------
+function vistaLado() {
+  const p = db.perfil, zs = L.zonas(p), conClave = !!IA.clave();
+  const campo = (c, t, u) => `<label class="sub" style="flex:1 1 120px">${t}<input class="campo" inputmode="decimal" data-perfil="${c}" value="${esc(p[c] ?? '')}" placeholder="${u}"></label>`;
+  return `<div class="fila" style="justify-content:space-between"><h1 style="margin:0">Mis datos</h1><button class="mini" style="background:var(--panel2)" data-act="lado" aria-label="Cerrar">✕</button></div>
+  <div class="card" style="margin-top:12px"><div class="fila">${campo('edad', 'Edad', 'años')}${campo('peso', 'Peso', 'kg')}${campo('altura', 'Estatura', 'cm')}${campo('fcRep', 'FC en reposo', 'lpm')}
+    <label class="sub" style="flex:1 1 120px">Sexo<select data-perfil="sexo"><option value="h">Hombre</option><option value="m" ${p.sexo === 'm' ? 'selected' : ''}>Mujer</option></select></label></div>
+    <div style="margin-top:10px">FC máxima: <b>${p.edad ? L.fcMax(p) + ' lpm' : '—'}</b> <span class="sub">(estimada por la edad)</span></div>
+    ${zs ? `<table style="width:100%;margin-top:8px;font-size:14px;border-collapse:collapse">${zs.map(z => `<tr><td>Z${z.z}</td><td>${z.n}</td><td>${z.de}–${z.a} lpm</td></tr>`).join('')}</table>`
+      : '<div class="sub" style="margin-top:6px">Con edad y FC en reposo calculo tus zonas de entrenamiento.</div>'}
+    <div class="sub" style="margin-top:8px">FC en reposo: mídela al despertar, acostado, 3 días seguidos.</div></div>
+  <div class="card"><h2>🤖 Claude</h2>
+    ${conClave ? `<div>✓ Conectado: lee tus fotos y comidas y responde tus preguntas.</div><button class="mini" style="background:var(--panel2);margin-top:6px" data-act="claveClaude">Desconectar</button>`
+      : `<div class="sub">Pega tu clave de API de Claude (console.anthropic.com → API Keys). Queda guardada solo en este teléfono.</div>
+    <div class="fila" style="margin-top:6px"><input class="campo" id="claveIA" type="password" autocomplete="off" placeholder="sk-ant-…" aria-label="clave de API"><button class="mini" data-act="claveClaude">Conectar</button></div>`}
+    ${conClave ? `<textarea class="campo" id="pregIA" rows="3" style="margin-top:10px" placeholder="Pregúntale algo: ¿cómo voy con la proteína esta semana?">${esc(preg?.q ?? '')}</textarea>
+    <button class="btn sec" data-act="preguntar" ${preg?.cargando ? 'disabled' : ''}>${preg?.cargando ? 'Pensando…' : 'Preguntar'}</button>
+    ${preg?.a ? `<div style="margin-top:8px;white-space:pre-wrap">${esc(preg.a)}</div>` : ''}` : ''}</div>
+  <div class="card"><h2>📅 Google Calendar</h2>
+    <input class="campo" id="calUrl" type="url" placeholder="Enlace del Apps Script (…/exec?token=…)" value="${esc(db.calUrl ?? '')}" aria-label="enlace del calendario">
+    <button class="btn sec" data-act="calendario">📅 Leer mi Google Calendar</button>
+    <div class="sub" style="margin-top:6px">Todo evento de tu calendario es fijo salvo el bloque 'Ejercicio': la app lo mueve al confirmar cada día.</div>
+    ${calMsg ? `<div style="margin-top:8px;color:#f0b429">${esc(calMsg)}</div>` : ''}
+    ${db.cal.leido ? `<div class="sub" style="margin-top:8px">Leído: ${fechaTxt(db.cal.leido, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>` : ''}</div>`;
+}
+// Lo que Claude ve al preguntarle: datos de la app sin fotos.
+function datosIA() {
+  const h = diaHoy(), hp = diaPlan(h);
+  const comidas = Object.fromEntries(Object.entries(db.comidas).slice(-7).map(([f, d]) => [f, Object.fromEntries(Object.entries(d).map(([k, c]) => [k, { kcal: c.kcal, prot: c.prot, txt: c.txt }]))]));
+  return { hoy: h, perfil: db.perfil, meta: db.meta, planHoy: hp?.ses ? { sesion: hp.ses.n, hora: hp.hora, min: hp.min, hecho: hp.hecho } : null,
+    nutricionHoy: nutDe(hp), comidas, pesos: db.pesos.slice(-10), actividad: db.actividad.slice(-15),
+    sesiones: db.sesiones.slice(-10).map(x => ({ fecha: x.fecha, tipo: x.tipo, grupos: x.grupos, min: x.min })) };
+}
+
 function vistaAvance() {
   const r = L.resumenSemana(db.sesiones), nv = L.niveles(db.sesiones);
   const conKg = [...new Set(db.sesiones.flatMap(s => s.series.filter(x => x.kg !== null && x.kg !== undefined).map(x => x.ex)))];
@@ -516,9 +536,11 @@ function grafico(pts) {
 
 function render() {
   const enCurso = tab === 'hoy' && db.actual;
-  $('#app').innerHTML = tab === 'inicio' ? vistaInicio() : tab === 'avance' ? vistaAvance() : tab === 'plan' ? vistaMeta() : tab === 'nutricion' ? vistaNutricion()
+  $('#app').innerHTML = tab === 'inicio' ? vistaInicio() : tab === 'avance' ? vistaAvance() : tab === 'nutricion' ? vistaNutricion()
     : enCurso ? (db.actual.tipo ? vistaCardio() : vistaEntreno()) : vistaHoy();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('sel', b.dataset.tab === tab));
+  $('#lado').classList.toggle('on', lado); $('#velo').classList.toggle('on', lado);
+  if (lado) $('#lado').innerHTML = vistaLado();
 }
 
 // ---------- timer de descanso (por hora de término: sigue bien si la pantalla se bloquea) ----------
@@ -676,8 +698,24 @@ const acciones = {
   calendario: () => leerCalendario(),
   objetivo: el => { db.perfil.objetivo = el.dataset.v; guardar(); render(); },
   plato: el => { const h = diaHoy(); (db.platos[h] = db.platos[h] || {})[el.dataset.k] = el.dataset.v; guardar(); render(); },
-  otra: el => { otra = { k: el.dataset.v, foto: null, items: [{ a: '', g: '' }] }; render(); },
-  masAlim: () => { otra.items.push({ a: '', g: '' }); render(); },
+  otra: el => { otra = { k: el.dataset.v, foto: null, items: [{ t: '', g: '' }] }; render(); },
+  masAlim: () => { otra.items.push({ t: '', g: '' }); render(); },
+  anotarComida: () => {
+    // La comida que toca por la hora; si ya está anotada, la siguiente libre.
+    const hecho = db.comidas[diaHoy()] || {}, orden = L.COMIDAS.map(c => c[0]), hr = new Date().getHours();
+    const i = hr < 11 ? 0 : hr < 16 ? 1 : hr < 19 ? 2 : 3, k = [...orden.slice(i), ...orden.slice(0, i)].find(x => !hecho[x]);
+    tab = 'nutricion'; otra = k ? { k, foto: null, items: [{ t: '', g: '' }] } : null; render();
+    (k && $('[data-act=fotoComida]') || $('#app')).closest('.card')?.scrollIntoView({ block: 'center' });
+  },
+  lado: () => { lado = !lado; render(); },
+  claveClaude: () => { IA.guardarClave(IA.clave() ? '' : $('#claveIA').value.trim()); preg = null; render(); },
+  preguntar: async () => {
+    const q = $('#pregIA').value.trim();
+    if (!q) return;
+    preg = { q, cargando: true }; render();
+    try { preg.a = await IA.preguntar(q, datosIA()); } catch (e) { preg.a = 'No se pudo: ' + e.message; }
+    preg.cargando = false; render();
+  },
   cancelarOtra: () => { otra = null; render(); },
   comida: el => {
     const k = el.dataset.v, h = diaHoy(), dia = db.comidas[h] = db.comidas[h] || {};
@@ -685,14 +723,23 @@ const acciones = {
     else { const x = L.menu(nutDe(diaPlan(h)), h, db.platos[h]).find(x => x.k === k); dia[k] = { kcal: x.kcal, prot: x.prot }; }
     registrarComida();
   },
-  guardarOtra: el => {
-    const h = diaHoy(), m = L.macrosDe(otra.items), kcal = m.kcal + (+$('#oKcal').value || 0), prot = m.prot + (+$('#oProt').value || 0);
-    if (!kcal) return;
-    (db.comidas[h] = db.comidas[h] || {})[el.dataset.v] = { kcal, prot, otra: true, txt: m.txt, foto: otra.foto };
+  guardarOtra: async el => {
+    const h = diaHoy(), k = el.dataset.v, man = +$('#oKcal').value || 0, manP = +$('#oProt').value || 0;
+    const txt = otra.items.filter(x => x.t.trim()).map(x => `${x.t.trim()}${+x.g ? ` ${+x.g} g` : ''}`).join(', ');
+    let reg;
+    if (man) reg = { kcal: man, prot: manP, txt };
+    else if (!IA.clave()) { otra.msg = 'Anota las kcal o conecta Claude en ☰.'; return render(); }
+    else if (!txt && !otra.foto) { otra.msg = 'Saca una foto o escribe qué comiste.'; return render(); }
+    else {
+      otra.cargando = true; otra.msg = ''; render();
+      try { const r = await IA.estimarComida(otra.items, otra.foto); reg = { kcal: Math.round(r.kcal), prot: Math.round(r.prot), txt: r.comida, nota: r.nota }; }
+      catch (e) { otra.cargando = false; otra.msg = 'No se pudo analizar: ' + e.message; return render(); }
+    }
+    (db.comidas[h] = db.comidas[h] || {})[k] = { ...reg, otra: true, foto: otra.foto };
     // Las fotos pesan: solo se guardan las de la última semana.
     const corte = L.sumarDias(h, -7);
     Object.entries(db.comidas).forEach(([f, d]) => f < corte && Object.values(d).forEach(c => delete c.foto));
-    try { guardar(); } catch { delete db.comidas[h][el.dataset.v].foto; }
+    try { guardar(); } catch { delete db.comidas[h][k].foto; }
     otra = null; registrarComida();
   },
   pesar: () => {

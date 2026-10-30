@@ -197,12 +197,12 @@ export function interpretarClima(codigo, probLluvia = 0) {
 
 // ================= Plan hacia una meta (ver METODOLOGIA.md) =================
 
-// Zonas por reserva de FC (Karvonen); FCmáx de Tanaka si no se conoce la real.
+// Zonas por reserva de FC (Karvonen); FCmáx estimada por la edad (Tanaka).
 export const ZONAS = [
   [1, .5, .6, 'Recuperación', 'conversación fácil'], [2, .6, .7, 'Base aeróbica', 'frases completas'],
   [3, .7, .8, 'Tempo', 'frases cortas'], [4, .8, .9, 'Umbral · round de lucha', 'pocas palabras'], [5, .9, 1, 'Máximo', 'no puedes hablar'],
 ];
-export const fcMax = p => +p.fcMax || Math.round(208 - 0.7 * p.edad);
+export const fcMax = p => Math.round(208 - 0.7 * p.edad);
 export function zonas(p) {
   if (!p?.edad || !p?.fcRep) return null;
   const rep = +p.fcRep, res = fcMax(p) - rep;
@@ -397,7 +397,6 @@ export const kgSemana = p => Math.round(tmb(p) * 1.5 * (OBJETIVOS[p.objetivo].kc
 export const ALIMENTOS = {
   huevo: ['Huevo', 13, 1, 10, 50], pavo: ['Jamón de pavo', 20, 2, 3], yogur: ['Yogur griego natural', 10, 4, .4], quesillo: ['Quesillo', 12, 3, 4],
   pollo: ['Pechuga de pollo (cocida)', 31, 0, 4], vacuno: ['Posta o lomo (cocido)', 28, 0, 8], atun: ['Atún al agua', 26, 0, 1], salmon: ['Salmón', 22, 0, 12], merluza: ['Merluza o reineta', 18, 0, 1.5],
-  cerdo: ['Cerdo (cocido)', 27, 0, 14], cerdo_canton: ['Cerdo cantonés (char siu)', 22, 10, 9], verduras: ['Verduras o ensalada', 2, 5, .2],
   pan: ['Pan integral', 9, 43, 3], avena: ['Avena', 13, 66, 7], arroz: ['Arroz (cocido)', 2.7, 28, .3], papa: ['Papa (cocida)', 2, 20, .1],
   fideos: ['Fideos (cocidos)', 5.8, 31, .9], porotos: ['Porotos o lentejas (cocidos)', 9, 20, .5], platano: ['Plátano (1 mediano ≈ 120 g)', 1.1, 23, .3],
   palta: ['Palta', 2, 9, 15], aceite: ['Aceite de oliva', 0, 0, 100], mani: ['Maní sin sal', 26, 16, 49], nueces: ['Nueces', 15, 14, 65],
@@ -451,11 +450,6 @@ export function porciones(obj, [prots, carb, gras]) {
   }).filter(x => x.gr > 0);
   const tot = k => Math.round(items.reduce((a, x) => a + x.gr * m(x.id, k), 0));
   return { items, prot: tot(0), cho: tot(1), gra: tot(2), kcal: kcalDe(tot(0), tot(1), tot(2)) };
-}
-// Lo que el usuario pesó: [{a: id de ALIMENTOS, g: gramos}] → kcal, proteína y el texto para mostrarlo.
-export function macrosDe(items) {
-  const ok = items.filter(x => ALIMENTOS[x.a] && +x.g > 0), tot = k => Math.round(ok.reduce((a, x) => a + x.g * ALIMENTOS[x.a][k] / 100, 0));
-  return { kcal: kcalDe(tot(1), tot(2), tot(3)), prot: tot(1), txt: ok.map(x => `${ALIMENTOS[x.a][0].replace(/ \(.*/, '')} ${+x.g} g`).join(', ') };
 }
 // elegidos = { comida: plato } que el usuario cambió hoy; alt = los otros platos de esa comida.
 export function menu(d, fecha, elegidos = {}) {
