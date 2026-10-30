@@ -73,12 +73,25 @@ Valores por kg de peso corporal (ISSN 2017; ACSM/AND/DC 2016; Morton et al., 201
 - **Suplementos con buena evidencia** (opcionales): creatina monohidrato 3–5 g/día y cafeína 3–6 mg/kg unos 60 min antes de sesiones intensas, que no conviene tomar de noche porque afecta el sueño.
 - **Sueño**: 7–9 h. Es parte de la recuperación, por eso es una meta diaria.
 
+### 4.1 Dieta según objetivo (pestaña 🍽️ Nutrición)
+
+Con objetivo, peso, altura, edad y sexo la app pasa de gramos por kg a una dieta con calorías:
+
+- **Gasto del día** = metabolismo basal de Mifflin-St Jeor × factor según el día del plan: descanso 1,35, movilidad 1,4, Z2 1,5, fuerza 1,55, intervalos 1,65, rounds o partido 1,7.
+- **Objetivo**: perder grasa −20 % (≈ 0,5 kg/semana, dentro del 0,5–1 % del peso que protege el músculo; Helms et al., 2014), mantener 0 %, ganar músculo +10 % (≈ 0,25 kg/semana; Iraki et al., 2019).
+- **Reparto**: proteína primero (perder 2,2 g/kg porque el déficit pide más; mantener 1,8; ganar 2,0), grasa 25 % de las calorías y el carbohidrato completa. Así el carbohidrato sube solo los días de entreno.
+- **Menú**: 4 comidas (desayuno 25 %, almuerzo 35 %, colación 15 %, cena 25 %) con alimentos comunes; los gramos se calculan para que cada comida calce con sus macros, y las combinaciones rotan día a día.
+- **Pal**: la silueta de Inicio refleja el día: los músculos se encienden con la proteína registrada y la cara cambia según las calorías (feliz al cumplir ±10 %, triste si pasa del 115 %).
+
 ## 5. Metas diarias y rachas
 
 Las metas diarias son simples y dependen del plan: moverse (la sesión del día o, en días libres, 20 min de caminata o movilidad), agua, proteína, snack saludable, elongar y dormir 7 h o más. **Un día cuenta para la racha si te moviste y cumpliste al menos 4 de las 6 metas.** Así un día imperfecto no rompe la racha, pero no moverse sí. El día de hoy no corta la racha mientras no termine.
 
 ## Referencias
 
+- Helms ER, Aragon AA, Fitschen PJ (2014). Evidence-based recommendations for natural bodybuilding contest preparation: nutrition and supplementation. *J Int Soc Sports Nutr* 11:20.
+- Iraki J et al. (2019). Nutrition recommendations for bodybuilders in the off-season: a narrative review. *Sports* 7(7):154.
+- Mifflin MD et al. (1990). A new predictive equation for resting energy expenditure in healthy individuals. *Am J Clin Nutr* 51(2).
 - Andreato LV et al. (2017). Physical and physiological profiles of Brazilian jiu-jitsu athletes: a systematic review. *Sports Med Open* 3:9.
 - Bosquet L et al. (2007). Effects of tapering on performance: a meta-analysis. *Med Sci Sports Exerc* 39(8).
 - Gabbett TJ (2016). The training–injury prevention paradox. *Br J Sports Med* 50(5).

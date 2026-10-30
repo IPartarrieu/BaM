@@ -6,6 +6,7 @@ La base técnica (fases, zonas de FC, nutrición, rachas) está en [METODOLOGIA.
 - **Plan:** meta con fecha → fases Base / Construcción / Específica / Descarga; perfil (edad, peso, FC reposo) → zonas Karvonen; metas de la semana (sesiones fijas ⭐ y variables) repartidas en los huecos libres del Google Calendar; el día anterior eliges sesión, hora y minutos, y la app mueve el bloque "Ejercicio" en el calendario. Sin horario fijo.
 - **Inicio:** meta y fase, sesión de hoy, metas del día con racha (moverse + 4 de 6), registro de actividad, nutrición del día, silueta muscular y, los lunes, resumen de la semana anterior.
 - **Entrenar:** clima del día (Open-Meteo) → tiempo sugerido → grupos → rutina: calentamiento 5 min → ejercicios (series × reps × kg) → Core (rutina fija de abdominales con disco) → elongar 5 min. Timer de descanso al marcar cada serie.
+- **Nutrición:** objetivo (perder grasa, mantener o ganar músculo) → calorías y macros del día según la sesión del plan → menú de 4 comidas con gramos. Registras lo que comiste ("comí esto" u "otra cosa" con kcal y proteína) y la silueta, tu Pal, reacciona: se ilumina con la proteína y cambia la cara según las calorías. Registro de peso y ritmo esperado hacia el peso meta.
 - **Avance:** meta de 3 sesiones/semana, hexágono por grupo (volumen y subida de carga), evolución de kg por ejercicio, logros, historial y respaldo JSON.
 - Datos solo en el teléfono (localStorage `bam-v1`).
 
@@ -23,8 +24,11 @@ La base técnica (fases, zonas de FC, nutrición, rachas) está en [METODOLOGIA.
 | Minutos sugeridos según clima | `docs/logic.js` → `interpretarClima` |
 | Meta semanal, logros, nivel del hexágono | `docs/logic.js` → `META`, `logros`, `niveles` |
 | Silueta (formas de músculos) | `docs/app.js` → `CONTORNO_DER`, `FRENTE`, `ESPALDA` (puntos del lado derecho, se espejan) |
+| Objetivos, calorías por tipo de día, reparto de macros | `docs/logic.js` → `OBJETIVOS`, `ACTIVIDAD`, `dieta` |
+| Alimentos, comidas y combinaciones del menú | `docs/logic.js` → `ALIMENTOS`, `COMIDAS` |
+| Mensajes y caras del Pal | `docs/logic.js` → `animoPal`; dibujo en `docs/app.js` → `silueta(pal)` |
 | Básicos de hoy | `docs/app.js` → `BASICOS` |
-| Pantallas | `docs/app.js` → `vistaInicio`, `vistaHoy`, `vistaEntreno`, `vistaAvance` |
+| Pantallas | `docs/app.js` → `vistaInicio`, `vistaHoy`, `vistaEntreno`, `vistaNutricion`, `vistaAvance` |
 
 Al agregar o quitar archivos precargados, subir la versión `CACHE` en `docs/sw.js`.
 

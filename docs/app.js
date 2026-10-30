@@ -28,7 +28,7 @@ function cargar() {
   return { sesiones: [], actual: null, ...defaults() };
 }
 function defaults() {
-  return { basicos: {}, perfil: {}, meta: null, actividad: [], cal: { leido: null, ev: [] }, dias: {} };
+  return { basicos: {}, perfil: {}, meta: null, actividad: [], cal: { leido: null, ev: [] }, dias: {}, comidas: {}, pesos: [] };
 }
 const guardar = () => localStorage.setItem(KEY, JSON.stringify(db));
 
@@ -135,7 +135,7 @@ function editorDia(f) {
 }
 
 const tipoDiaDe = hp => hp?.deporte && !hp?.ses ? 'deporte' : hp?.ses?.tipo ?? 'descanso';
-const nutDe = hp => L.nutricion(db.perfil.peso, tipoDiaDe(hp), hp?.ses ? L.minSesion(hp.ses) : 0);
+const nutDe = hp => L.dieta(db.perfil, tipoDiaDe(hp), hp?.ses ? L.minSesion(hp.ses) : 0);
 const ACTIVIDADES = ['Caminata', 'Trote', 'Bici', 'Fútbol', 'Clase de BJJ', 'Movilidad', 'Otra'];
 
 function vistaInicio() {
@@ -169,8 +169,9 @@ function vistaInicio() {
     <input id="actMin" inputmode="numeric" value="30" aria-label="minutos" style="flex:1;min-width:60px" class="campo"><button class="mini" data-act="actividad">Registrar</button></div>
     ${deHoy.map(a => `<div class="sub">${esc(a.tipo)} · ${esc(a.min)} min</div>`).join('')}</div>
   <div class="card"><h2>Nutrición de hoy</h2>${nut
-    ? `<div class="fila" style="justify-content:space-around;text-align:center">${stat(nut.prot + ' g', 'proteína')}${stat(nut.cho + ' g', 'carbohidrato')}${stat(String(nut.agua).replace(".", ",") + ' L', 'agua')}</div><div class="sub" style="margin-top:8px">${nut.tip}</div>`
-    : '<div class="sub">Ingresa tu peso en 🎯 Plan para calcular proteína, carbohidrato y agua.</div>'}</div>
+    ? `<div class="fila" style="justify-content:space-around;text-align:center">${nut.kcal ? stat(nut.kcal.toLocaleString('es-CL'), 'kcal') : ''}${stat(nut.prot + ' g', 'proteína')}${stat(nut.cho + ' g', 'carbohidrato')}${stat(String(nut.agua).replace(".", ",") + ' L', 'agua')}</div><div class="sub" style="margin-top:8px">${nut.tip}</div>`
+    : '<div class="sub">Ingresa tu peso para calcular proteína, carbohidrato y agua.</div>'}
+    <button class="btn sec" data-act="tab" data-tab="nutricion">🍽️ ${nut?.kcal ? 'Ver mi dieta de hoy' : 'Armar mi dieta'}</button></div>
   <div class="card"><h2>Mapa muscular</h2>${silueta()}
     <div class="fila sub" style="justify-content:center;gap:12px;margin:6px 0 10px">${Object.entries(COLOR).filter(([g]) => g !== 'potencia').map(([g, c]) => `<span><b style="color:${c}">●</b> ${L.GRUPOS[g].nombre.split(' ')[0]}</span>`).join('')}</div>
     ${info}</div>
@@ -229,15 +230,20 @@ const ESPALDA = [
   ['isquios', [[104, 228], [124, 228], [134, 236], [131, 264], [118, 274], [108, 264]]],
   ['gemelos', [[108, 282], [124, 280], [132, 300], [126, 322], [116, 326], [110, 310]]],
 ];
-function silueta() {
+// pal = { cara, nivel }: solo el frente, con cara; los músculos se encienden con la proteína del día.
+function silueta(pal) {
   const forma = dx => ([m, pts, central]) => {
-    const sel = m === musculo, c = COLOR[L.MUSCULOS[m][1]];
-    const attrs = `data-act="musculo" data-v="${m}" fill="${c}" fill-opacity="${sel ? .95 : .42}" stroke="${sel ? '#fff' : c}" stroke-opacity="${sel ? 1 : .7}" stroke-width="${sel ? 2 : 1}" style="cursor:pointer"`;
+    const sel = !pal && m === musculo, c = COLOR[L.MUSCULOS[m][1]];
+    const attrs = `${pal ? '' : `data-act="musculo" data-v="${m}" style="cursor:pointer"`} fill="${c}" fill-opacity="${sel ? .95 : pal ? .12 + .8 * pal.nivel : .42}" stroke="${sel ? '#fff' : c}" stroke-opacity="${sel ? 1 : .7}" stroke-width="${sel ? 2 : 1}"`;
     return (central ? [pts] : [pts, espejo(pts)]).map(p => `<path d="${suave(mover(p, dx))}" ${attrs}><title>${L.MUSCULOS[m][0]}</title></path>`).join('');
   };
   const cuerpo = dx => `<ellipse cx="${100 + dx}" cy="28" rx="15" ry="20" fill="#26324d" stroke="#3a4a6e"/><path d="${suave(mover(CONTORNO, dx))}" fill="#26324d" stroke="#3a4a6e" stroke-width="1.5"/>`;
   const detalle = `<g stroke="#0f1420" stroke-opacity=".55" fill="none" pointer-events="none">
     <path d="M100,118 V178 M91,134 H109 M90,150 H110 M90,164 H110"/><path d="M300,60 V184"/></g>`;
+  if (pal) return `<svg viewBox="28 0 144 362" class="${pal.cara === 2 ? 'pal-feliz' : ''}" style="width:100%;max-width:150px;display:block;margin:auto" role="img" aria-label="Tu Pal">
+    ${cuerpo(0)}${FRENTE.map(forma(0)).join('')}${detalle}
+    <g fill="#e8ecf4"><circle cx="94" cy="24" r="2"/><circle cx="106" cy="24" r="2"/></g>
+    <path d="M93,${36 - pal.cara} Q100,${36 + pal.cara * 3} 107,${36 - pal.cara}" stroke="#e8ecf4" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
   return `<svg viewBox="0 0 400 365" width="100%" style="max-width:440px;display:block;margin:auto" role="img" aria-label="Silueta muscular interactiva">
     ${cuerpo(0)}${cuerpo(200)}${FRENTE.map(forma(0)).join('')}${ESPALDA.map(forma(200)).join('')}${detalle}
     <text x="100" y="364" text-anchor="middle">Frente</text><text x="300" y="364" text-anchor="middle">Espalda</text></svg>`;
@@ -392,6 +398,49 @@ function tarjetaAbs() {
     <div class="fila sub">Disco <input inputmode="decimal" data-k="abskg" value="${esc(a.absKg)}" style="width:70px;background:var(--panel2);color:var(--txt);border:1px solid #33405f;border-radius:8px;padding:6px;text-align:center"> kg · ${L.ABS_DESC_EJ} s entre ejercicios, ${L.ABS_DESC_RONDA} s entre rondas</div>${html}</div>`;
 }
 
+// ---------- Nutrición: objetivo → dieta del día; el cuerpo de Inicio es el Pal que reacciona a lo comido ----------
+let otra = null; // comida que se está registrando como "otra cosa"
+const comidoHoy = () => { const c = Object.values(db.comidas[diaHoy()] || {});
+  return { n: c.length, kcal: c.reduce((a, x) => a + x.kcal, 0), prot: c.reduce((a, x) => a + x.prot, 0) }; };
+const miles = n => Math.round(n).toLocaleString('es-CL');
+const TIPO_DIA = { descanso: 'Día de descanso', movilidad: 'Día de movilidad', z2: 'Día de cardio Z2', fuerza: 'Día de fuerza', intervalos: 'Día de intervalos', rounds: 'Día de rounds', deporte: 'Día de partido' };
+
+function vistaNutricion() {
+  const p = db.perfil, hp = diaPlan(diaHoy()), d = nutDe(hp), hoy = db.comidas[diaHoy()] || {};
+  const campo = (c, t) => `<label class="sub" style="flex:1 1 90px">${t}<input class="campo" inputmode="decimal" data-perfil="${c}" value="${esc(p[c] ?? '')}"></label>`;
+  const objetivo = `<div class="card"><h2>Tu objetivo</h2>
+    <div class="fila chips">${Object.entries(L.OBJETIVOS).map(([k, O]) => chip('objetivo', k, `${O.i} ${O.n}`, p.objetivo === k)).join('')}</div>
+    <div class="fila" style="margin-top:8px">${campo('peso', 'Peso (kg)')}${campo('pesoMeta', 'Peso meta')}${campo('altura', 'Altura (cm)')}${campo('edad', 'Edad')}
+      <label class="sub" style="flex:1 1 90px">Sexo<select data-perfil="sexo"><option value="h">Hombre</option><option value="m" ${p.sexo === 'm' ? 'selected' : ''}>Mujer</option></select></label></div>
+    ${d?.kcal && p.objetivo !== 'mantener' ? (() => { const v = L.kgSemana(p), falta = +p.pesoMeta ? p.pesoMeta - p.peso : 0;
+      return `<div class="sub" style="margin-top:8px">Ritmo esperado: ${v > 0 ? '+' : ''}${String(v).replace('.', ',')} kg por semana${falta && Math.sign(falta) === Math.sign(v) ? ` · llegas a ${esc(p.pesoMeta)} kg en ~${Math.ceil(falta / v)} semanas` : ''}.</div>`; })() : ''}</div>`;
+  if (!d?.kcal) return `<h1>🍽️ Nutrición</h1>
+    <div class="card" style="text-align:center">${silueta({ cara: 0, nivel: 0 })}<div style="margin-top:8px">Soy tu Pal. Cuéntame tu objetivo, peso, altura y edad, y te armo la dieta de cada día.</div></div>${objetivo}`;
+  const c = comidoHoy(), a = L.animoPal(d, c, new Date().getHours()), m = L.menu(d, diaHoy());
+  const barra = (t, v, meta, u, col) => `<div class="sub" style="margin-top:6px">${t} · <b style="color:var(--txt)">${miles(v)}</b> / ${miles(meta)} ${u}</div>
+    <div class="barra" style="margin:3px 0"><i style="width:${Math.min(100, v / meta * 100)}%;background:${v > meta * 1.15 ? '#f0b429' : col}"></i></div>`;
+  const comida = x => { const r = hoy[x.k];
+    return `<div class="card bloque ${r ? 'ok' : ''}"><h3>${x.nom}${x.k === 'colacion' && hp?.ses ? ' · antes o después de entrenar' : ''}</h3>
+    <ul class="lista">${x.items.map(i => `<li>${i.txt}</li>`).join('')}<li>Verduras a gusto</li></ul>
+    <div class="sub">${x.kcal} kcal · P ${x.prot} g · C ${x.cho} g · G ${x.gra} g</div>
+    ${r ? `<div class="fila" style="margin-top:6px"><span>✓ ${r.otra ? `Otra cosa: ${r.kcal} kcal, ${r.prot} g proteína` : 'Comí esto'}</span><button class="mini" style="background:var(--panel2)" data-act="comida" data-v="${x.k}">Deshacer</button></div>`
+      : otra === x.k ? `<div class="fila" style="margin-top:6px"><input class="campo" id="oKcal" inputmode="numeric" placeholder="kcal" aria-label="kcal"><input class="campo" id="oProt" inputmode="numeric" placeholder="proteína g" aria-label="proteína"><button class="mini" data-act="guardarOtra" data-v="${x.k}">Guardar</button></div>`
+      : `<div class="fila" style="margin-top:6px"><button class="mini" data-act="comida" data-v="${x.k}">✓ Comí esto</button><button class="mini" style="background:var(--panel2)" data-act="otra" data-v="${x.k}">Comí otra cosa</button></div>`}</div>`; };
+  const pesos = db.pesos.slice(-5).reverse();
+  return `<h1>🍽️ Nutrición</h1>
+  <div class="card"><div class="fila" style="flex-wrap:nowrap;align-items:flex-start">
+    <div style="flex:0 0 110px">${silueta({ cara: a.cara, nivel: Math.min(1, c.prot / d.prot) })}</div>
+    <div style="flex:1"><div style="background:var(--panel2);border-radius:12px;padding:10px;font-weight:600">${a.msg}</div>
+      ${barra('Calorías', c.kcal, d.kcal, 'kcal', 'var(--ok)')}${barra('Proteína', c.prot, d.prot, 'g', 'var(--az)')}</div></div></div>
+  <div class="card"><h2>Dieta de hoy</h2><div class="sub">${TIPO_DIA[tipoDiaDe(hp)]} · ${L.OBJETIVOS[p.objetivo].i} ${L.OBJETIVOS[p.objetivo].n}</div>
+    <div class="fila" style="justify-content:space-around;text-align:center;margin-top:8px">${[[miles(d.kcal), 'kcal'], [d.prot + ' g', 'proteína'], [d.cho + ' g', 'carbohidrato'], [d.gra + ' g', 'grasa']].map(([v, t]) => `<div><div style="font-size:20px;font-weight:700">${v}</div><div class="sub">${t}</div></div>`).join('')}</div>
+    <div class="sub" style="margin-top:8px">💧 Agua ${String(d.agua).replace('.', ',')} L · ${d.tip}</div></div>
+  ${m.map(comida).join('')}
+  <div class="card"><h2>Peso</h2><div class="fila"><input class="campo" id="pesoHoy" inputmode="decimal" placeholder="kg de hoy" aria-label="peso de hoy"><button class="mini" data-act="pesar">Registrar</button></div>
+    ${pesos.map(x => `<div class="sub">${fechaTxt(x.fecha, { day: 'numeric', month: 'short' })} · ${String(x.kg).replace('.', ',')} kg</div>`).join('')}</div>
+  ${objetivo}`;
+}
+
 const ICONO = { z2: '🫁', intervalos: '⏱️', rounds: '🥋', movilidad: '🧘' };
 function vistaAvance() {
   const r = L.resumenSemana(db.sesiones), nv = L.niveles(db.sesiones);
@@ -447,7 +496,7 @@ function grafico(pts) {
 
 function render() {
   const enCurso = tab === 'hoy' && db.actual;
-  $('#app').innerHTML = tab === 'inicio' ? vistaInicio() : tab === 'avance' ? vistaAvance() : tab === 'plan' ? vistaMeta()
+  $('#app').innerHTML = tab === 'inicio' ? vistaInicio() : tab === 'avance' ? vistaAvance() : tab === 'plan' ? vistaMeta() : tab === 'nutricion' ? vistaNutricion()
     : enCurso ? (db.actual.tipo ? vistaCardio() : vistaEntreno()) : vistaHoy();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('sel', b.dataset.tab === tab));
 }
@@ -526,6 +575,13 @@ async function moverBloque(f, hora, min) {
   guardar(); render();
 }
 
+// La meta de proteína de Metas de hoy se marca sola al llegar con lo registrado.
+function registrarComida() {
+  const h = diaHoy(), d = nutDe(diaPlan(h));
+  db.basicos[h] = { ...db.basicos[h], prot: comidoHoy().prot >= d.prot };
+  guardar(); render();
+}
+
 const acciones = {
   tab: el => { tab = el.dataset.tab; render(); scrollTo(0, 0); },
   min: el => { form.min = +el.dataset.v; form.factor = 1; form.plan = null; form.item = null; render(); },
@@ -596,6 +652,26 @@ const acciones = {
     if (db.dias[f].item !== 'libre' && db.calUrl) moverBloque(f, db.dias[f].hora, db.dias[f].min); else render();
   },
   calendario: () => leerCalendario(),
+  objetivo: el => { db.perfil.objetivo = el.dataset.v; guardar(); render(); },
+  otra: el => { otra = el.dataset.v; render(); $('#oKcal')?.focus(); },
+  comida: el => {
+    const k = el.dataset.v, h = diaHoy(), dia = db.comidas[h] = db.comidas[h] || {};
+    if (dia[k]) delete dia[k];
+    else { const x = L.menu(nutDe(diaPlan(h)), h).find(x => x.k === k); dia[k] = { kcal: x.kcal, prot: x.prot }; }
+    registrarComida();
+  },
+  guardarOtra: el => {
+    const h = diaHoy(), kcal = +$('#oKcal').value || 0, prot = +$('#oProt').value || 0;
+    if (!kcal) return;
+    (db.comidas[h] = db.comidas[h] || {})[el.dataset.v] = { kcal, prot, otra: true };
+    otra = null; registrarComida();
+  },
+  pesar: () => {
+    const kg = +String($('#pesoHoy').value).replace(',', '.');
+    if (!(kg > 20 && kg < 300)) return;
+    db.pesos = db.pesos.filter(x => x.fecha !== diaHoy()).concat({ fecha: diaHoy(), kg });
+    db.perfil.peso = kg; guardar(); render();
+  },
   fijo: el => { db.actual[el.dataset.v] = true; guardar(); render(); timer(300, el.dataset.v === 'cal' ? 'Calentamiento de articulaciones' : 'Elongar'); },
   serie: el => {
     const a = db.actual, k = el.dataset.k;
@@ -653,7 +729,7 @@ document.addEventListener('click', ev => {
 
 document.addEventListener('input', ev => {
   const c = ev.target.dataset.perfil;
-  if (c) { db.perfil[c] = +String(ev.target.value).replace(',', '.') || null; guardar(); return; }
+  if (c) { db.perfil[c] = ev.target.tagName === 'SELECT' ? ev.target.value : +String(ev.target.value).replace(',', '.') || null; guardar(); return; }
   if (ev.target.id === 'calUrl') { db.calUrl = ev.target.value.trim() || null; guardar(); return; }
   const { k, f } = ev.target.dataset;
   if (!k || !db.actual) return;

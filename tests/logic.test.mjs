@@ -119,4 +119,20 @@ const b = { mov: true, agua: true, prot: true, sueno: true };
 const bas = { '2026-10-25': b, '2026-10-26': b, '2026-10-27': { ...b, mov: false }, '2026-10-28': b, '2026-10-29': { mov: true } };
 assert.deepEqual(L.racha(bas, '2026-10-29'), { actual: 1, mejor: 2 }); // hoy aún no cumple: no corta
 assert.equal(L.racha({ ...bas, '2026-10-29': b }, '2026-10-29').actual, 2);
+
+// Dieta: déficit/superávit según objetivo, más carbohidrato el día de fuerza, menú que suma la meta (±5 %)
+const yo = { peso: 80, altura: 178, edad: 32, sexo: 'h' };
+assert.equal(L.dieta(yo, 'fuerza').kcal, undefined); // sin objetivo: solo lo básico por kg
+const dp = L.dieta({ ...yo, objetivo: 'perder' }, 'fuerza'), dm = L.dieta({ ...yo, objetivo: 'mantener' }, 'fuerza');
+assert.ok(dp.kcal < dm.kcal && dp.prot > dm.prot && L.dieta({ ...yo, objetivo: 'ganar' }, 'fuerza').kcal > dm.kcal);
+assert.ok(L.dieta({ ...yo, objetivo: 'perder' }, 'descanso').cho < dp.cho);
+assert.ok(L.kgSemana({ ...yo, objetivo: 'perder' }) < 0 && L.kgSemana({ ...yo, objetivo: 'ganar' }) > 0);
+for (const f of ['2026-10-30', '2026-10-31', '2026-11-01']) {
+  const m = L.menu(dp, f), kcal = m.reduce((a, x) => a + x.kcal, 0), prot = m.reduce((a, x) => a + x.prot, 0);
+  assert.ok(Math.abs(kcal / dp.kcal - 1) < .05 && Math.abs(prot / dp.prot - 1) < .05, f);
+}
+// El Pal: hambre sin registros, feliz al cumplir, triste al pasarse
+assert.equal(L.animoPal(dp, { n: 0, kcal: 0, prot: 0 }, 15).cara, -1);
+assert.equal(L.animoPal(dp, { n: 4, kcal: dp.kcal, prot: dp.prot }).cara, 2);
+assert.equal(L.animoPal(dp, { n: 4, kcal: dp.kcal * 1.3, prot: dp.prot }).cara, -1);
 console.log('ok');

@@ -374,6 +374,71 @@ export function nutricion(peso, tipo = 'descanso', minEntreno = 0) {
     agua: Math.round((peso * .035 + minEntreno / 60 * .6) * 4) / 4, tip: TIP[tipo] };
 }
 
+// ---------- Dieta según objetivo (ver METODOLOGIA.md §4.1) ----------
+// Gasto = Mifflin-St Jeor × factor del día; −20 % para perder grasa, +10 % para ganar músculo.
+// Proteína primero, grasa 25 % de las calorías y el carbohidrato completa (sube los días de entreno).
+export const OBJETIVOS = {
+  perder: { n: 'Perder grasa', i: '🔥', kcal: .8, prot: 2.2 },
+  mantener: { n: 'Mantener y rendir', i: '⚖️', kcal: 1, prot: 1.8 },
+  ganar: { n: 'Ganar músculo', i: '💪', kcal: 1.1, prot: 2 },
+};
+export const ACTIVIDAD = { descanso: 1.35, movilidad: 1.4, z2: 1.5, fuerza: 1.55, intervalos: 1.65, rounds: 1.7, deporte: 1.7 };
+export const tmb = p => Math.round(10 * p.peso + 6.25 * p.altura - 5 * p.edad + (p.sexo === 'm' ? -161 : 5));
+export function dieta(p, tipo = 'descanso', minEntreno = 0) {
+  const base = nutricion(p?.peso, tipo, minEntreno), O = OBJETIVOS[p?.objetivo];
+  if (!base || !O || !p.altura || !p.edad) return base;
+  const kcal = Math.round(tmb(p) * ACTIVIDAD[tipo] * O.kcal / 50) * 50, prot = Math.round(p.peso * O.prot / 5) * 5, gra = Math.round(kcal * .25 / 9 / 5) * 5;
+  return { ...base, kcal, prot, gra, cho: Math.max(0, Math.round((kcal - prot * 4 - gra * 9) / 40) * 10) };
+}
+// Cambio de peso por semana con el objetivo en un día promedio (7700 kcal ≈ 1 kg).
+export const kgSemana = p => Math.round(tmb(p) * 1.5 * (OBJETIVOS[p.objetivo].kcal - 1) * 7 / 77) / 100;
+
+// Alimentos por 100 g: [nombre, proteína, carbohidrato, grasa, gramos por unidad (se muestra en unidades)].
+export const ALIMENTOS = {
+  huevo: ['Huevo', 13, 1, 10, 50], pavo: ['Jamón de pavo', 20, 2, 3], yogur: ['Yogur griego natural', 10, 4, .4], quesillo: ['Quesillo', 12, 3, 4],
+  pollo: ['Pechuga de pollo (cocida)', 31, 0, 4], vacuno: ['Posta o lomo (cocido)', 28, 0, 8], atun: ['Atún al agua', 26, 0, 1], salmon: ['Salmón', 22, 0, 12],
+  pan: ['Pan integral', 9, 43, 3], avena: ['Avena', 13, 66, 7], arroz: ['Arroz (cocido)', 2.7, 28, .3], papa: ['Papa (cocida)', 2, 20, .1],
+  fideos: ['Fideos (cocidos)', 5.8, 31, .9], porotos: ['Porotos o lentejas (cocidos)', 9, 20, .5], platano: ['Plátano', 1.1, 23, .3, 120],
+  palta: ['Palta', 2, 9, 15], aceite: ['Aceite de oliva', 0, 0, 100], mani: ['Maní sin sal', 26, 16, 49], nueces: ['Nueces', 15, 14, 65],
+};
+// [clave, nombre, fracción del día, plantillas [proteínas, carbohidrato, grasa]]; la plantilla rota cada día.
+export const COMIDAS = [
+  ['desayuno', 'Desayuno', .25, [[['huevo', 'pavo'], 'pan', 'palta'], [['yogur'], 'avena', 'nueces']]],
+  ['almuerzo', 'Almuerzo', .35, [[['pollo'], 'arroz', 'aceite'], [['vacuno'], 'papa', 'aceite'], [['atun'], 'porotos', 'aceite']]],
+  ['colacion', 'Colación', .15, [[['yogur'], 'platano', 'mani'], [['quesillo'], 'pan', 'palta']]],
+  ['cena', 'Cena', .25, [[['salmon'], 'papa', 'palta'], [['pollo'], 'fideos', 'aceite'], [['vacuno'], 'arroz', 'aceite']]],
+];
+const kcalDe = (p, c, g) => Math.round(p * 4 + c * 4 + g * 9);
+// Gramos de cada alimento para llegar a {prot, cho, gra}: cada grupo cubre su macro descontando lo que aportan
+// los otros; se repite porque todos aportan a los tres (Gauss-Seidel, converge en pocas vueltas).
+export function porciones(obj, [prots, carb, gras]) {
+  const grupos = [prots, [carb], [gras]], meta = [obj.prot, obj.cho, obj.gra], g = {}, m = (id, k) => ALIMENTOS[id][k + 1] / 100;
+  for (let v = 0; v < 8; v++) grupos.forEach((ids, k) => {
+    const otros = Object.entries(g).filter(([id]) => !ids.includes(id)).reduce((a, [id, x]) => a + x * m(id, k), 0);
+    ids.forEach(id => { g[id] = Math.max(0, (meta[k] - otros) / ids.length / m(id, k)); });
+  });
+  const items = Object.entries(g).map(([id, x]) => {
+    const u = ALIMENTOS[id][4], gr = u ? Math.max(1, Math.round(x / u)) * u : Math.round(x / 5) * 5;
+    return { id, gr, txt: `${ALIMENTOS[id][0]} ${u ? `× ${gr / u}` : `${gr} g`}` };
+  }).filter(x => x.gr > 0);
+  const tot = k => Math.round(items.reduce((a, x) => a + x.gr * m(x.id, k), 0));
+  return { items, prot: tot(0), cho: tot(1), gra: tot(2), kcal: kcalDe(tot(0), tot(1), tot(2)) };
+}
+export function menu(d, fecha) {
+  const n = Math.round(dia(fecha) / 864e5);
+  return COMIDAS.map(([k, nom, s, ops]) => ({ k, nom, ...porciones({ prot: d.prot * s, cho: d.cho * s, gra: d.gra * s }, ops[n % ops.length]) }));
+}
+
+// El Pal (la silueta de Inicio) reacciona a lo comido. cara: −1 triste, 0 neutro, 1 contento, 2 feliz.
+export function animoPal(d, comido, hora = 12) {
+  const k = comido.kcal / d.kcal, p = comido.prot / d.prot;
+  if (k > 1.15) return { cara: -1, msg: 'Me pasé de calorías hoy. Mañana volvemos al plan, sin drama.' };
+  if (k >= .9 && p >= .9) return { cara: 2, msg: '¡Lleno y fuerte! Cumplimos la meta del día 💪' };
+  if (!comido.n) return hora < 11 ? { cara: 0, msg: '¡Buenos días! Partamos con el desayuno.' } : { cara: -1, msg: 'Tengo hambre… todavía no registras nada hoy.' };
+  if (p < k - .15) return { cara: 0, msg: `Me faltan ${Math.round(d.prot - comido.prot)} g de proteína para recuperar los músculos.` };
+  return { cara: 1, msg: `Vamos bien: quedan ${Math.round(d.kcal - comido.kcal)} kcal para hoy.` };
+}
+
 // Metas del día. Cuenta para la racha si te moviste y cumpliste al menos 4 de las 6.
 export const diaCumplido = b => !!b?.mov && Object.values(b).filter(v => v === true).length >= 4;
 export function racha(basicos, hoy = iso(new Date())) {

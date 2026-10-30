@@ -48,7 +48,9 @@
   .fila > * { min-width:0; } .fila > select { flex:1 1 120px; } .fila > input { flex:1 1 70px; }
   .card { overflow-wrap:anywhere; } .card .card { background:var(--panel2); padding:12px; margin:8px 0 4px; }
   .card .card select, .card .card .campo, .card .card .chips button { background:var(--panel); }
-  nav button { padding:10px 2px; font-size:13px; white-space:nowrap; }
+  nav button { padding:6px 2px 8px; font-size:12px; white-space:nowrap; } nav button b { display:block; font-size:20px; font-weight:400; }
+  .pal-feliz { animation:rebote 1.2s ease-in-out infinite; } @keyframes rebote { 50% { transform:translateY(-6px); } }
+  @media (prefers-reduced-motion:reduce) { .pal-feliz { animation:none; } }
   svg text { fill:var(--sub); font:12px system-ui; }
 </style>
 </head>
@@ -56,7 +58,7 @@
 <main id="app"></main>
 <div id="timer"><div class="sub" id="timerTxt">Descanso</div><div class="t" id="timerT">0:00</div>
   <div class="fila"><button class="mini" data-act="t-15">−15 s</button><button class="mini" data-act="t+15">+15 s</button><button class="mini" style="background:var(--ac)" data-act="tfin">Listo</button></div></div>
-<nav><button data-act="tab" data-tab="inicio">🏠 Inicio</button><button data-act="tab" data-tab="hoy">🥋 Entrenar</button><button data-act="tab" data-tab="plan">🎯 Plan</button><button data-act="tab" data-tab="avance">📊 Avance</button></nav>
+<nav><button data-act="tab" data-tab="inicio"><b>🏠</b>Inicio</button><button data-act="tab" data-tab="hoy"><b>🥋</b>Entrenar</button><button data-act="tab" data-tab="nutricion"><b>🍽️</b>Nutrición</button><button data-act="tab" data-tab="plan"><b>🎯</b>Plan</button><button data-act="tab" data-tab="avance"><b>📊</b>Avance</button></nav>
 <script type="module" src="app.js"></script>
 </body>
 </html>
