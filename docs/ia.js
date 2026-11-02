@@ -33,7 +33,7 @@ export async function estimarComida(items, foto) {
   const lista = items.filter(x => x.t.trim()).map(x => `- ${x.t.trim()}${+x.g ? `: ${+x.g} g` : ''}`).join('\n');
   const content = foto ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: foto.split(',')[1] } }] : [];
   content.push({ type: 'text', text: `Estima las calorías y macronutrientes de lo que comí${foto ? ' (la foto es el plato)' : ''}.
-${lista ? `Lo que comí, con el peso que medí:\n${lista}\n` : ''}Usa los pesos indicados tal cual; si falta un peso, estímalo por la foto o con una porción típica.
+${lista ? `Lo que comí (el peso va solo si lo medí):\n${lista}\n` : ''}Usa los pesos indicados tal cual; si falta un peso, estímalo por la foto o con la porción típica de lo que describí (p. ej. \"2 huevos\", \"un plato de arroz\").
 "comida": descripción corta en español con los pesos (ej. "Cerdo cantonés 200 g y arroz 100 g"). "nota": en una frase, qué supusiste.
 kcal en kilocalorías; prot, cho y gra en gramos.` });
   return JSON.parse(await pedir({ output_config: { effort: 'low', format: { type: 'json_schema', schema: COMIDA } }, messages: [{ role: 'user', content }] }));

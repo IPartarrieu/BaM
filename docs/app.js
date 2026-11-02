@@ -1,5 +1,6 @@
 import * as L from './logic.js';
 import * as IA from './ia.js';
+import * as AC from './acerca.js';
 
 const KEY = 'bam-v1';
 const COORD_DEF = [-36.83, -73.05]; // Concepción, si no hay GPS
@@ -10,11 +11,13 @@ const nombreEj = id => Object.values(L.GRUPOS).flatMap(G => G.ej).concat(L.ABS).
 let db = cargar();
 let tab = db.actual ? 'hoy' : 'inicio';
 let musculo = null;
-let form = { min: null, grupos: [], factor: 1, plan: null, item: null };
+let form = { min: null, grupos: [], factor: 1, plan: null, item: null, sust: {}, cambiando: null }; // sust: { ejercicio original: sustituto }; plantilla/rpe: sesión A/B del plan
+const rpeMax = r => L.tope(r ?? '7-8'); // RPE más alto aceptado para subir la carga: tope del rango objetivo de la fase
 let clima = null;
 let exSel = null;
 let audio = null, wake = null;
 let calMsg = '';
+let cambiandoEj = null; // ejercicio de la sesión en curso cuyo cambio está abierto
 let editando = null; // fecha del editor abierto en Entrenamiento
 let lado = false, preg = null; // panel lateral abierto; { q, a, cargando } de la pregunta a Claude
 const edit = {}; // cambios sin confirmar por fecha: { item, hora, min }
@@ -250,7 +253,7 @@ function silueta(pal) {
 
 function vistaHoy() {
   const r = L.resumenSemana(db.sesiones), min = minElegido();
-  const plan = form.grupos.length ? L.armarRutina(min, form.grupos, form.factor ?? 1) : null;
+  const plan = form.grupos.length ? L.armarRutina(min, form.grupos, form.factor ?? 1, form.sust, form.plantilla) : null;
   const hoy = diaHoy(), conMeta = db.meta && !semana().est.fin;
   const climaHtml = !clima ? '<span class="sub">Consultando el clima…</span>' : clima.error ? '<span class="sub">Sin datos de clima (sin conexión)</span>' :
     `<div class="fila"><span style="font-size:38px">${clima.i}</span><div><b>${clima.txt}, ${clima.temp} °C</b>
@@ -267,31 +270,53 @@ function vistaHoy() {
   <div class="card"><h2>¿Qué grupo muscular?</h2><div class="grupos">
     ${Object.entries(L.GRUPOS).map(([g, G]) => `<button data-act="grupo" data-v="${g}" class="${form.grupos.includes(g) ? 'sel' : ''}">${G.icono} ${G.nombre}<span class="tag ${r.grupos.has(g) ? '' : 'pend'}">${r.grupos.has(g) ? '✓ hecho esta semana' : 'pendiente'}</span></button>`).join('')}</div></div>
   ${plan ? vistaPlan(plan) : '<div class="sub" style="text-align:center">Elige uno o más grupos para armar la rutina.</div>'}
-  ${cardMapa()}${conMeta ? `<h2 style="margin-top:16px">Plan</h2>${vistaMeta()}` : ''}`;
+  ${cardMapa()}${conMeta ? `<h2 style="margin-top:16px">Plan</h2>${vistaMeta()}` : ''}${cardAcerca()}`;
+}
+
+// «Acerca de»: por qué la rutina es como es (tipo, intensidad, orden, descansos…) con sus fuentes.
+function cardAcerca() {
+  return `<div class="card" id="acerca"><h2>Acerca de</h2><div class="sub">${AC.INTRO}</div>
+    ${AC.SECCIONES.map(x => `<details><summary>${x.t}</summary><ul class="lista">${x.i.map(i => `<li>${i}</li>`).join('')}</ul>
+      <div class="sub">Evidencia: ${x.ev}.${x.f.length ? ` Fuentes: ${x.f.join('; ')}.` : ''}</div></details>`).join('')}
+    <details><summary>Referencias (${Object.keys(AC.REFS).length})</summary>${Object.entries(AC.REFS).map(([k, [c, doi]]) =>
+      `<div class="sub" style="margin-top:6px"><b>${k}.</b> ${c} <a href="https://doi.org/${doi}" target="_blank" rel="noopener">doi:${doi}</a></div>`).join('')}</details></div>`;
+}
+
+// Lista de reemplazos para un ejercicio que no se puede hacer hoy (act: acción que aplica la elección).
+function panelCambio(e, enRutina, act) {
+  const alt = L.alternativas(e, enRutina);
+  return `<div class="card"><div class="sub" style="margin-bottom:4px">No puedes hacer ${esc(e.orig ? nombreEj(e.orig) : e.n)}: elige otro del mismo grupo.</div>
+    ${alt.map(x => `<button class="alt" data-act="${act}" data-v="${e.id}" data-n="${x.id}"><span><b>${x.id === (e.orig ?? e.id) ? 'Volver a ' : ''}${x.n}</b><small class="sub">${x.s} × ${x.r}${x.x ? ' ' + x.x : ''} · descanso ${x.d} s · ${[...new Set(x.m.map(m => L.MUSCULOS[m][0]))].slice(0, 3).join(', ')}</small></span></button>`).join('') || '<div class="sub">No hay otro ejercicio libre en este grupo.</div>'}
+    <button class="mini" style="background:var(--panel);margin-top:6px" data-act="cambiar" data-v="${e.id}">Cerrar</button></div>`;
 }
 
 function vistaPlan(plan) {
   if (!plan.ej.length && !plan.conAbs) return `<div class="card"><h2>Rutina propuesta</h2><div class="sub">No alcanza el tiempo para ejercicios: sube los minutos o quita los abdominales.</div></div>`;
-  return `<div class="card" id="rutina"><h2>Rutina propuesta</h2><ul class="lista">
+  return `<div class="card" id="rutina"><h2>Rutina propuesta${form.plantilla ? ` · Fuerza ${form.plantilla.k} (cuerpo completo)` : ''}</h2>
+    ${form.rpe ? `<div class="sub">Esfuerzo objetivo: RPE ${form.rpe}, o sea dejar ${10 - L.tope(form.rpe)} a ${10 - L.piso(form.rpe)} repeticiones sin hacer. Sube la carga solo si completas el tope de repeticiones.</div>` : ''}<ul class="lista">
     <li>Calentamiento de articulaciones · 5 min</li>
-    ${plan.ej.map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · ${kgTxt(e, L.sugerirKg(db.sesiones, e))}</li>`).join('')}
+    ${plan.ej.map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · ${kgTxt(e, L.sugerirKg(db.sesiones, e, rpeMax(form.rpe)))}
+      <button class="mini" style="background:var(--panel2);padding:4px 10px;font-size:13px" data-act="cambiar" data-v="${e.id}" aria-label="Cambiar ${esc(e.n)}">↔ Cambiar</button>${form.cambiando === e.id ? panelCambio(e, plan.ej, 'sustituir') : ''}</li>`).join('')}
     ${plan.conAbs ? `<li><b style="color:var(--txt)">🔥 Core: abdominales con disco</b> · ${L.ABS_RONDAS} rondas fijas · ${Math.round(L.ABS_SEG / 60)} min</li>` : ''}
     <li>Elongar · 5 min</li></ul>
     ${plan.sobraMin >= 5 ? `<div class="sub">Sobran ~${plan.sobraMin} min: úsalos para técnica de BJJ o movilidad.</div>` : ''}
-    <button class="btn" data-act="empezar">Empezar</button></div>`;
+    <button class="btn" data-act="empezar">Empezar</button>
+    <div class="sub" style="margin-top:8px;text-align:center"><a data-act="verAcerca" role="button" tabindex="0" style="color:var(--az);cursor:pointer;text-decoration:underline">¿Por qué esta rutina, estos descansos y este orden?</a></div></div>`;
 }
 
 function vistaEntreno() {
   const a = db.actual;
   const total = a.ej.reduce((n, e) => n + e.s, 0) + (a.abs ? L.ABS_RONDAS * L.ABS.length : 0);
   const hechas = Object.keys(a.hechos).length;
-  return `<h1>${a.grupos.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' + ')}</h1>
-  <div class="sub">Plan ${a.min} min · <span id="reloj">${transcurrido()}</span> · ${hechas}/${total} series</div>
+  return `<h1>${a.plantilla ? `🏋️ Fuerza ${a.plantilla.k} · cuerpo completo` : a.grupos.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' + ')}</h1>
+  <div class="sub">Plan ${a.min} min · <span id="reloj">${transcurrido()}</span> · ${hechas}/${total} series${a.rpe ? ` · esfuerzo objetivo RPE ${a.rpe}` : ''}</div>
   <div class="barra"><i style="width:${hechas / total * 100}%"></i></div>
   ${bloqueFijo('cal', '1 · Calentamiento de articulaciones', L.CALENTAMIENTO)}
   ${a.ej.map((e, i) => tarjetaEj(e, i)).join('')}
   ${a.abs ? tarjetaAbs() : ''}
   ${bloqueFijo('elo', `${a.abs ? 4 : 3} · Elongar`, L.ELONGACION)}
+  <div class="card"><h2>Al terminar</h2><div class="fila sub">RPE de la sesión <select id="sRpe" style="width:auto">${[5, 6, 7, 8, 9, 10].map(n => `<option ${n === L.tope(a.rpe ?? '7') ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div class="sub">10 es el fallo, 9 deja 1 repetición, 8 deja 2, 7 deja 3. Con eso decido si subes la carga la próxima vez.</div></div>
   <button class="btn" data-act="terminar">Terminar y guardar</button>
   <button class="btn sec" data-act="cancelar">Descartar sesión</button>`;
 }
@@ -365,11 +390,16 @@ function tarjetaEj(e, n) {
     if (!h) todas = false;
     return `<div class="serie ${h ? 'hecho' : ''}"><span class="sub">${i + 1}</span>
       ${e.kg === null ? '<span class="sub">corporal</span>' : `<input inputmode="decimal" data-k="${k}" data-f="kg" value="${esc(v.kg ?? e.kgSug)}" aria-label="kg serie ${i + 1}">`}
-      <input inputmode="numeric" data-k="${k}" data-f="reps" value="${esc(v.reps ?? (L.tope(e.r) || ''))}" aria-label="reps serie ${i + 1}">
+      <input inputmode="numeric" data-k="${k}" data-f="reps" value="${esc(v.reps ?? (L.piso(e.r) || ''))}" aria-label="reps serie ${i + 1}">
       <button data-act="serie" data-k="${k}">${h ? '✓' : 'Serie lista'}</button></div>`;
   }).join('');
+  const fuertes = a.ej.filter(x => x.p === 2 || x.p === 3), aprox = e.kg === null ? [] : L.aproximacion(+e.kgSug, fuertes[0]?.id === e.id ? 3 : fuertes.some(x => x.id === e.id) ? 2 : 0);
+  const sinEmpezar = !Array.from({ length: e.s }, (_, i) => a.hechos[`${e.id}:${i}`]).some(Boolean);
   return `<div class="card bloque ${todas ? 'ok' : ''}"><h3>2.${n + 1} · ${e.n}</h3>
-    <div class="sub">${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · descanso ${e.d} s${e.kg !== null ? ` · sugerido ${e.kgSug} kg` : ''}</div>
+    <div class="sub">${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · descanso ${e.d} s${e.kg !== null ? ` · sugerido ${e.kgSug} kg` : ''}${e.orig ? ` · cambiado (era ${esc(nombreEj(e.orig))})` : ''}</div>
+    ${aprox.length ? `<div class="sub" style="margin-top:4px">Antes, aproximación (no cuenta como serie): ${aprox.map(x => `${String(x.kg).replace('.', ',')} kg × ${x.reps}`).join(' · ')}</div>` : ''}
+    ${sinEmpezar ? `<button class="mini" style="background:var(--panel2);margin-top:6px" data-act="cambiarEj" data-v="${e.id}">↔ No puedo hacerlo</button>` : ''}
+    ${sinEmpezar && cambiandoEj === e.id ? panelCambio(e, a.ej, 'sustituirEj') : ''}
     <div class="serie sub"><span></span><span>${e.kg === null ? '' : 'kg'}</span><span>reps</span><span></span></div>${filas}</div>`;
 }
 
@@ -393,10 +423,10 @@ const comidoHoy = () => { const c = Object.values(db.comidas[diaHoy()] || {});
 const formOtra = () => `<div class="card">
   ${otra.foto ? `<img class="plato" src="${otra.foto}" alt="Foto del plato">` : ''}
   <label class="btn sec" style="text-align:center">📷 ${otra.foto ? 'Cambiar foto' : 'Sacar foto del plato'}<input type="file" accept="image/*" capture="environment" data-act="fotoComida" hidden></label>
-  <div class="sub" style="margin-top:8px">¿Qué comiste y cuánto pesaba?</div>
-  ${otra.items.map((it, i) => `<div class="fila" style="margin-top:6px"><input class="campo" style="flex:3 1 140px" data-oi="${i}" data-of="t" value="${esc(it.t)}" placeholder="Ej.: cerdo cantonés" aria-label="qué comiste"><input class="campo" style="flex:1 1 70px" data-oi="${i}" data-of="g" value="${esc(it.g)}" inputmode="numeric" placeholder="g" aria-label="gramos"></div>`).join('')}
+  <div class="sub" style="margin-top:8px">¿Qué comiste? No hace falta pesar: escribe cantidades como "2 huevos", "un plato de arroz" o "media palta". Si lo pesaste, anota los gramos.</div>
+  ${otra.items.map((it, i) => `<div class="fila" style="margin-top:6px"><input class="campo" style="flex:3 1 140px" data-oi="${i}" data-of="t" value="${esc(it.t)}" placeholder="Ej.: cerdo cantonés" aria-label="qué comiste"><input class="campo" style="flex:1 1 70px" data-oi="${i}" data-of="g" value="${esc(it.g)}" inputmode="numeric" placeholder="g (opcional)" aria-label="gramos, opcional"></div>`).join('')}
   <button class="mini" style="background:var(--panel2);margin-top:6px" data-act="masAlim">+ Otro alimento</button>
-  <div class="sub" style="margin-top:8px">${IA.clave() ? 'Claude calcula las calorías con la foto y lo que escribas. Si ya las sabes, anótalas:' : 'Anota las calorías y la proteína (o conecta Claude en ☰ para que las calcule):'}</div>
+  <div class="sub" style="margin-top:8px">${IA.clave() ? 'Claude calcula las calorías con la foto y lo que escribas. Si ya las sabes, anótalas:' : 'Calculo las calorías y la proteína con porciones típicas. Si ya las sabes, anótalas:'}</div>
   <div class="fila" style="margin-top:6px"><input class="campo" id="oKcal" inputmode="numeric" placeholder="kcal" aria-label="kcal"><input class="campo" id="oProt" inputmode="numeric" placeholder="proteína g" aria-label="proteína"></div>
   ${otra.msg ? `<div style="margin-top:8px;color:#f0b429">${esc(otra.msg)}</div>` : ''}
   <div class="fila" style="margin-top:8px"><button class="mini" data-act="guardarOtra" data-v="${otra.k}" ${otra.cargando ? 'disabled' : ''}>${otra.cargando ? 'Analizando…' : 'Guardar'}</button><button class="mini" style="background:var(--panel2)" data-act="cancelarOtra">Cancelar</button></div></div>`;
@@ -628,27 +658,40 @@ function registrarComida() {
 
 const acciones = {
   tab: el => { tab = el.dataset.tab; render(); scrollTo(0, 0); },
-  min: el => { form.min = +el.dataset.v; form.factor = 1; form.plan = null; form.item = null; render(); },
-  grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; form.factor = 1; form.plan = null; form.item = null; render(); },
+  min: el => { form.min = +el.dataset.v; if (!form.plantilla) { form.factor = 1; form.plan = null; form.item = null; } form.sust = {}; form.cambiando = null; render(); },
+  grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; form.factor = 1; form.plan = null; form.item = null; form.plantilla = null; form.rpe = null; form.sust = {}; form.cambiando = null; render(); },
   musculo: el => { musculo = musculo === el.dataset.v ? null : el.dataset.v; render(); },
   basico: el => { const d = diaHoy(); db.basicos[d] = { ...db.basicos[d], [el.dataset.v]: el.checked }; guardar(); render(); },
-  entrenarGrupo: el => { form.grupos = [el.dataset.v]; tab = 'hoy'; render(); scrollTo(0, 0); },
+  entrenarGrupo: el => { form.grupos = [el.dataset.v]; form.plantilla = null; form.rpe = null; form.factor = 1; form.sust = {}; form.cambiando = null; tab = 'hoy'; render(); scrollTo(0, 0); },
   empezar: () => {
-    const plan = L.armarRutina(minElegido(), form.grupos, form.factor ?? 1);
+    const plan = L.armarRutina(minElegido(), form.grupos, form.factor ?? 1, form.sust, form.plantilla);
     const ultAbs = [...db.sesiones].reverse().flatMap(s => s.series).find(x => x.ex === L.ABS[0].id);
     db.actual = {
       inicio: new Date().toISOString(), min: minElegido(), grupos: [...form.grupos], abs: plan.conAbs, absKg: ultAbs?.kg ?? 10,
-      plan: form.plan, item: form.item, factor: form.factor ?? 1,
+      plan: form.plan, item: form.item, factor: form.factor ?? 1, plantilla: form.plantilla ?? null, rpe: form.rpe ?? null,
       clima: clima && !clima.error ? { txt: clima.txt, lluvia: clima.lluvia } : null,
-      ej: plan.ej.map(e => ({ ...e, kgSug: L.sugerirKg(db.sesiones, e) })), hechos: {}, inp: {}, cal: false, elo: false,
+      ej: plan.ej.map(e => ({ ...e, kgSug: L.sugerirKg(db.sesiones, e, rpeMax(form.rpe)) })), hechos: {}, inp: {}, cal: false, elo: false,
     };
     guardar(); pantallaEncendida(); render(); scrollTo(0, 0);
+  },
+  verAcerca: () => { $('#acerca').scrollIntoView(); $('#acerca details').open = true; },
+  cambiar: el => { form.cambiando = form.cambiando === el.dataset.v ? null : el.dataset.v; render(); },
+  sustituir: el => { // la clave es el ejercicio original, aunque ya esté cambiado
+    const e = L.armarRutina(minElegido(), form.grupos, form.factor ?? 1, form.sust, form.plantilla).ej.find(x => x.id === el.dataset.v);
+    form.sust = { ...form.sust, [e.orig ?? e.id]: el.dataset.n }; form.cambiando = null; render();
+  },
+  cambiarEj: el => { cambiandoEj = cambiandoEj === el.dataset.v ? null : el.dataset.v; render(); },
+  sustituirEj: el => {
+    const a = db.actual, i = a.ej.findIndex(x => x.id === el.dataset.v);
+    if (i < 0) return;
+    const n = L.sustituir(a.ej[i], el.dataset.n); // series ya hechas no se pierden: solo se cambia si no empezó
+    a.ej[i] = { ...n, kgSug: L.sugerirKg(db.sesiones, n, rpeMax(a.rpe)) }; cambiandoEj = null; guardar(); render();
   },
   planEmpezar: () => {
     const d = diaPlan(diaHoy()), ses = d?.ses;
     if (!ses) return;
     tab = 'hoy';
-    if (ses.tipo === 'fuerza') { form = { min: ses.min, grupos: [...ses.grupos], factor: ses.factor, plan: d.fecha, item: d.item.id }; render(); $('#rutina')?.scrollIntoView(); return; }
+    if (ses.tipo === 'fuerza') { form = { min: ses.min, grupos: [...ses.grupos], factor: ses.factor, plan: d.fecha, item: d.item.id, plantilla: ses.plantilla, rpe: ses.rpe, sust: {}, cambiando: null }; render(); $('#rutina')?.scrollIntoView(); return; }
     db.actual = { tipo: ses.tipo, ses, inicio: new Date().toISOString(), plan: d.fecha, item: d.item.id, paso: -1 };
     guardar(); pantallaEncendida(); render(); scrollTo(0, 0);
   },
@@ -728,9 +771,12 @@ const acciones = {
     const txt = otra.items.filter(x => x.t.trim()).map(x => `${x.t.trim()}${+x.g ? ` ${+x.g} g` : ''}`).join(', ');
     let reg;
     if (man) reg = { kcal: man, prot: manP, txt };
-    else if (!IA.clave()) { otra.msg = 'Anota las kcal o conecta Claude en ☰.'; return render(); }
     else if (!txt && !otra.foto) { otra.msg = 'Saca una foto o escribe qué comiste.'; return render(); }
-    else {
+    else if (!IA.clave() || !otra.foto && !txt) { // sin Claude: porciones típicas
+      const r = L.estimarTexto(otra.items.filter(x => x.t.trim()));
+      if (r.sinReconocer.length) { otra.msg = `No reconozco: ${r.sinReconocer.join(', ')}. Anota las kcal de eso o conecta Claude en ☰.`; return render(); }
+      reg = { kcal: r.kcal, prot: r.prot, txt, nota: r.nota };
+    } else {
       otra.cargando = true; otra.msg = ''; render();
       try { const r = await IA.estimarComida(otra.items, otra.foto); reg = { kcal: Math.round(r.kcal), prot: Math.round(r.prot), txt: r.comida, nota: r.nota }; }
       catch (e) { otra.cargando = false; otra.msg = 'No se pudo analizar: ' + e.message; return render(); }
@@ -777,11 +823,11 @@ const acciones = {
     });
     if (!series.length && !confirm('No marcaste ninguna serie. ¿Guardar igual?')) return;
     db.sesiones.push({
-      fecha: a.inicio, tipo: 'fuerza', plan: a.plan, item: a.item, factor: a.factor, grupos: a.grupos, min: a.min, duracionMin: Math.round((Date.now() - new Date(a.inicio)) / 60000),
+      fecha: a.inicio, tipo: 'fuerza', plan: a.plan, item: a.item, factor: a.factor, plantilla: a.plantilla, rpe: +($('#sRpe')?.value) || null, grupos: a.grupos, min: a.min, duracionMin: Math.round((Date.now() - new Date(a.inicio)) / 60000),
       abs: Object.keys(a.hechos).some(k => k.startsWith('abs:')), clima: a.clima, series,
     });
     db.basicos[diaHoy()] = { ...db.basicos[diaHoy()], mov: true };
-    db.actual = null; form = { min: null, grupos: [], factor: 1, plan: null, item: null }; tab = 'avance';
+    db.actual = null; form = { min: null, grupos: [], factor: 1, plan: null, item: null, sust: {}, cambiando: null }; tab = 'avance';
     wake?.release(); guardar(); render(); scrollTo(0, 0);
   },
   cancelar: () => { if (confirm('¿Descartar la sesión en curso? Se pierden las series marcadas.')) { db.actual = null; wake?.release(); guardar(); render(); } },

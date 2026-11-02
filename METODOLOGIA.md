@@ -15,13 +15,13 @@ El plan es un bloque de **preparación física general → específica** que ter
 
 | Fase | Parte del plan | Fuerza | Cardio | Objetivo |
 |---|---|---|---|---|
-| Base | primer tercio | 75 % de las series, RPE 6–7 (2–3 repeticiones en reserva) | Z2 continuo 30–40 min | Adaptar tendones y articulaciones y construir la base aeróbica |
-| Construcción | segundo tercio | 100 % de las series, RPE 7–8 | Intervalos 6 × 3 min en Z4 / 2 min suave | Potencia aeróbica y carga de fuerza |
+| Base | primer tercio | 75 % de las series, RPE 6–7 (3–4 repeticiones en reserva) | Z2 continuo 30–40 min | Adaptar tendones y articulaciones y construir la base aeróbica |
+| Construcción | segundo tercio | 100 % de las series, RPE 7–8 (2–3 en reserva) | Intervalos 6 × 3 min en Z4 / 2 min suave | Potencia aeróbica y carga de fuerza |
 | Específica | último tercio | 85 % de las series, se mantiene la carga | Rounds de 5 min / 1 min de pausa, circuito de lucha en Z4–Z5 | Simular la demanda del combate |
-| Descarga | última semana | 60 % de las series, mismo kg | 3 rounds y Z2 corto | Llegar descansado: bajar el volumen ~40 % y mantener la intensidad (Bosquet et al., 2007) |
+| Descarga | última semana | ≈ 55 % de las series (tope total), mismo kg, RPE 6–7 | 3 rounds y Z2 corto | Llegar descansado: bajar el volumen ~40 % y mantener la intensidad (Bosquet et al., 2007) |
 
 Reglas de carga:
-- **Doble progresión** (ya estaba en la app): si en la sesión anterior se completó el tope de reps en todas las series, se suben 2,5 kg.
+- **Doble progresión**: si en la sesión anterior se completó el tope del rango de repeticiones en todas las series y el RPE no pasó del objetivo, sube la carga ≈ 5 % (ver §6).
 - **Subir de a poco.** No aumentar la carga semanal más de ~10–15 %. La razón carga aguda:crónica se mantiene entre 0,8 y 1,3 (Gabbett, 2016). El paso base → construcción → específica respeta ese margen.
 - **Entrenamiento concurrente.** La fuerza y el cardio intenso van en días distintos o separados por ≥ 6 h. Los intervalos no se ponen el día anterior a un día de fuerza de piernas pesada cuando se puede evitar.
 - **Otros deportes cuentan.** Un partido de fútbol es trabajo intermitente de alta intensidad. Si en la semana hay partido, se reemplaza una sesión de intervalos o rounds por Z2, y ese día solo se hace movilidad.
@@ -41,7 +41,7 @@ La app reparte lo pendiente en los días que quedan. Pone primero las fijas y de
 
 ### Sesiones del plan
 
-- **Fuerza A**: piernas + espalda + core. **Fuerza B**: pecho/hombros + brazos y agarre + core (en Base) o potencia (desde Construcción). Usa la misma rutina por grupos de la app, con las series multiplicadas por el factor de la fase.
+- **Fuerza A / B**: cuerpo completo (ver §6). Usa la rutina por plantilla de la app, con las series multiplicadas por el factor de la fase.
 - **Cardio Z2**: trote, bici, remo o elíptica. Se puede conversar en frases completas.
 - **Intervalos**: bici, remo o assault bike. 5 min de entrada en calor, 6 × (3 min Z4 + 2 min Z1) y 5 min de vuelta a la calma.
 - **Rounds**: circuito continuo de 5 min (sprawl, escape de cadera, swing, oso, levantada técnica, burpee) con 1 min de pausa, igual que los rounds de lucha.
@@ -86,6 +86,24 @@ Con objetivo, peso, altura, edad y sexo la app pasa de gramos por kg a una dieta
 ## 5. Metas diarias y rachas
 
 Las metas diarias son simples y dependen del plan: moverse (la sesión del día o, en días libres, 20 min de caminata o movilidad), agua, proteína, snack saludable, elongar y dormir 7 h o más. **Un día cuenta para la racha si te moviste y cumpliste al menos 4 de las 6 metas.** Así un día imperfecto no rompe la racha, pero no moverse sí. El día de hoy no corta la racha mientras no termine.
+
+## 6. Diseño de la sesión de fuerza («Acerca de»)
+
+La pestaña Entrenamiento tiene una sección «Acerca de» con la justificación y las fuentes. La revisión completa (57 referencias verificadas en PubMed, con DOI y PMID, y lo que no se pudo verificar) está en `REVISION-BIBLIOGRAFICA.md`. Lo que se aplicó en `docs/logic.js`:
+
+- **Orden por prioridad** (`p`): 1 explosivos, 2 básicos de piernas, 3 básicos de tren superior, 4 prevención (nórdico, Copenhague), 5 accesorios, 6 agarre y, al final, core. Dentro de cada prioridad se intercalan los grupos. Si falta tiempo se recorta desde el final; la prevención reserva 2 series (hasta el 40 % del tiempo) antes de repartir el resto.
+- **Descansos** (`d`): básicos pesados 2-3 min (peso muerto 180 s, press inclinado 150 s, hack, hip thrust, nórdico, jalón, remo con barra, militar y fondos 120 s); explosivos 90-150 s; accesorios 60-90 s; por lado o isométricos 60-90 s; abdominales 5 s / 90 s entre rondas.
+- **Cambiar un ejercicio**: sustitutos del mismo patrón (`pat`), con las mismas series; un explosivo solo por otro explosivo. Los ejercicios con `alt: true` (goblet, peso muerto rumano, curl femoral, aducción, dominadas, press con mancuernas, salto vertical) solo aparecen como sustitutos.
+- **Comida sin pesar**: `estimarTexto` calcula kcal y proteína con porciones típicas (valores orientativos, ±20 %).
+
+Aplicado después, a partir de la misma revisión:
+- **Cuerpo completo A/B** (`PLANTILLAS`): A = swing, peso muerto, press inclinado, jalón, nórdico, curl martillo, colgarse; B = salto al cajón, hack, press militar, remo con barra, Copenhague, face pull, farmer. Cada grupo se trabaja 2 veces por semana. Los explosivos entran desde Construcción; el core va en A siempre y en B solo en Base. Los básicos llevan 3 series (el ACSM 2026 indica 2-3) y la prevención 2. Las sesiones con core piden 75 min en el calendario (60 sin core) para que entren todos los patrones.
+- **Descarga real**: se mantienen A y B (`fijas: fuerzaA, fuerzaB, rounds`) con las mismas cargas y RPE 6-7, y un tope de series totales = factor × las de Construcción (la prevención se queda; accesorios y agarre pueden salir). Resultado: 10 series contra 18 (−44 %).
+- **Doble progresión**: repeticiones en rangos (`4-6`, `6-8`, `8-10`…). Se sube la carga solo si todas las series llegaron al tope y el RPE de la sesión (que ahora se registra al terminar) no pasó del objetivo de la fase (`FASES.*.rpe`). El paso es ≈ 5 % entre 1 y 2,5 kg (`paso`); los explosivos mantienen la carga.
+- **Series de aproximación** (`aproximacion`): 50 % × 5, 70 % × 3 y 85 % × 1 en el primer básico; 50 % × 5 y 70 % × 3 en los demás. No cuentan como series ni en el tiempo estimado (≈ 2-3 min).
+- **Separación fuerza-cardio ≥ 6 h**: `distribuir` ya deja una sola sesión por día y los días de deporte solo reciben movilidad, así que no se mezclan en el mismo día.
+
+Límites: cada ejercicio concreto se hace 1 vez por semana (lo que se repite es el grupo muscular); en Construcción son ≈ 6 series directas por grupo por semana, bajo las 10 que se piden para hipertrofia. En el modo libre («Entrena libre») la rutina sigue armándose por grupos, sin plantilla ni tope de descarga.
 
 ## Referencias
 

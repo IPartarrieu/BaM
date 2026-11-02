@@ -5,17 +5,28 @@ import * as L from '../docs/logic.js';
 const corta = L.armarRutina(30, ['piernas']), larga = L.armarRutina(90, ['piernas', 'core']);
 const seg = r => r.ej.reduce((a, e) => a + e.s * ((e.w ?? 40) + e.d) + L.CAMBIO_SEG, 0) + L.FIJO_SEG + (r.conAbs ? L.ABS_SEG : 0);
 assert.ok(seg(corta) <= 30 * 60 && corta.ej.length >= 1);
-assert.ok(seg(larga) <= 90 * 60 && larga.ej.length === L.GRUPOS.piernas.ej.length);
+assert.ok(seg(larga) <= 90 * 60 && larga.ej.length === L.GRUPOS.piernas.ej.filter(e => !e.alt).length);
 assert.equal(L.armarRutina(20, ['piernas', 'core']).ej.length, 0);
-// Dos grupos se alternan
-assert.deepEqual(L.armarRutina(90, ['espalda', 'brazos']).ej.slice(0, 2).map(e => e.g), ['espalda', 'brazos']);
+// Dos grupos de la misma prioridad se alternan
+assert.deepEqual(L.armarRutina(90, ['espalda', 'empuje']).ej.slice(0, 2).map(e => e.g), ['espalda', 'empuje']);
 
-// Doble progresión: tope en todas las series → +2,5 kg; si no, misma carga
-const pm = L.GRUPOS.piernas.ej[0];
-const ses = reps => [{ fecha: '2026-10-19T20:00:00Z', grupos: ['piernas'], series: reps.map(r => ({ ex: 'pm_hex', g: 'piernas', kg: 70, reps: r })) }];
-assert.equal(L.sugerirKg(ses([5, 5, 5, 5]), pm), 72.5);
-assert.equal(L.sugerirKg(ses([5, 5, 4, 4]), pm), 70);
+// Doble progresión: tope del rango en todas las series y esfuerzo dentro del objetivo → sube ≈ 5 % (1-2,5 kg); si no, misma carga
+const pm = L.GRUPOS.piernas.ej[0]; // 4 × 4-6
+const ses = (reps, rpe, id = 'pm_hex', kg = 70) => [{ fecha: '2026-10-19T20:00:00Z', grupos: ['piernas'], rpe, series: reps.map(r => ({ ex: id, g: 'piernas', kg, reps: r })) }];
+assert.equal(L.sugerirKg(ses([6, 6, 6, 6]), pm), 72.5);
+assert.equal(L.sugerirKg(ses([6, 6, 6, 6], 7), pm, 7), 72.5);   // dentro del objetivo
+assert.equal(L.sugerirKg(ses([6, 6, 6, 6], 9), pm, 7), 70);      // llegó, pero muy duro: no sube
+assert.equal(L.sugerirKg(ses([5, 5, 6, 6]), pm), 70);            // no llegó al tope en todas
+assert.equal(L.sugerirKg(ses([6, 6, 6]), pm), 70);               // faltó una serie
 assert.equal(L.sugerirKg([], pm), 60);
+const curl = L.GRUPOS.brazos.ej[0]; // curl martillo 10 kg, 3 × 10-12
+assert.equal(L.sugerirKg(ses([12, 12, 12], 7, 'curl_mart', 10), curl, 8), 11); // +1 kg (10 %), no +2,5 (25 %)
+const swing = L.GRUPOS.potencia.ej[0];
+assert.equal(L.sugerirKg(ses([10, 10, 10, 10, 10], 6, 'swing', 16), swing, 8), 16); // explosivos: mismo peso
+assert.deepEqual([L.paso(10), L.paso(24), L.paso(60), L.paso(0)], [1, 1, 2.5, 1]);
+assert.deepEqual(L.aproximacion(60), [{ kg: 30, reps: 5 }, { kg: 42.5, reps: 3 }, { kg: 50, reps: 1 }]);
+assert.equal(L.aproximacion(60, 2).length, 2); assert.equal(L.aproximacion(10).length, 0);
+assert.deepEqual([L.piso('4-6'), L.tope('4-6'), L.piso('5')], [4, 6, 5]);
 
 // Semana lunes-domingo, resumen y logros
 assert.equal(L.lunes('2026-10-25T12:00:00'), '2026-10-19'); // domingo
@@ -37,9 +48,9 @@ assert.ok(Math.abs(nv.piernas.carga - (75 / 70 - 1) / L.SUBIDA_TOPE) < 1e-9 && n
 assert.equal(L.interpretarClima(0).min, 75);
 assert.equal(L.interpretarClima(61).lluvia, true);
 assert.equal(L.interpretarClima(3, 80).txt, 'Lluvia');
-// 1 h con abdominales = 3 ejercicios, en el orden priorizado
-assert.deepEqual(L.armarRutina(60, ['piernas', 'core']).ej.map(e => e.id), ['pm_hex', 'hack', 'hip_thrust']);
-assert.deepEqual(L.armarRutina(60, ['espalda', 'core']).ej.map(e => e.id), ['jalon', 'remo_barra', 'face_pull']);
+// 1 h con abdominales = 3 ejercicios, por prioridad; la prevención (nórdico, Copenhague) no se pierde por falta de tiempo
+assert.deepEqual(L.armarRutina(60, ['piernas', 'core']).ej.map(e => e.id), ['pm_hex', 'nordico', 'copenhague']);
+assert.deepEqual(L.armarRutina(60, ['espalda', 'core']).ej.map(e => e.id), ['jalon', 'remo_barra', 'remo_uni']);
 assert.deepEqual(L.armarRutina(60, ['empuje', 'core']).ej.map(e => e.id), ['press_incl', 'militar', 'fondos']);
 // Silueta: todo músculo tiene ejercicios y todo músculo citado existe
 for (const m in L.MUSCULOS) assert.ok(L.ejerciciosDe(m).length > 0, m);
@@ -106,7 +117,7 @@ assert.equal(L.horaHabitual(ev), '19:30');
 // Reparto desde el jueves 29 (fase base): jueves con fútbol no recibe fuerza; fijas antes que variables
 const dias = ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01'].map(f => ({ fecha: f, d: L.dispDia(ev, f, { ahora: new Date('2026-10-29T10:00') }) }));
 const rep = L.distribuir('base', L.metasSemana('base', true), dias);
-assert.deepEqual(rep.dias.map(d => [d.item?.id, d.hora, d.min]), [['movilidad', '20:00', 25], ['fuerzaA', '19:30', 60], ['z2', '19:30', 35], ['fuerzaB', '19:30', 60]]);
+assert.deepEqual(rep.dias.map(d => [d.item?.id, d.hora, d.min]), [['movilidad', '20:00', 25], ['fuerzaA', '19:30', 75], ['z2', '19:30', 35], ['fuerzaB', '19:30', 75]]);
 assert.deepEqual(rep.sinLugar.map(x => x.id), ['z22']); // la variable que no cupo queda a la vista
 // El usuario fija el sábado a las 10:00 con fuerza B (el día anterior): se respeta y hay que mover/crear el bloque
 const rep2 = L.distribuir('base', L.metasSemana('base'), dias.map(x => x.fecha === '2026-10-31' ? { ...x, elegido: { item: 'fuerzaB', hora: '10:00', min: 75 } } : x));
@@ -137,3 +148,64 @@ assert.equal(L.animoPal(dp, { n: 0, kcal: 0, prot: 0 }, 15).cara, -1);
 assert.equal(L.animoPal(dp, { n: 4, kcal: dp.kcal, prot: dp.prot }).cara, 2);
 assert.equal(L.animoPal(dp, { n: 4, kcal: dp.kcal * 1.3, prot: dp.prot }).cara, -1);
 console.log('ok');
+
+// Orden por prioridad: explosivos primero, agarre antes que core pero después de los básicos
+{
+  const o = L.armarRutina(120, ['piernas', 'potencia', 'brazos']).ej;
+  assert.deepEqual(o.slice(0, 3).map(e => e.p), [1, 1, 1]);
+  const p = o.map(e => e.p); assert.deepEqual(p, [...p].sort((a, b) => a - b));
+  assert.ok(L.armarRutina(60, ['piernas']).ej.some(e => e.id === 'nordico') && L.armarRutina(60, ['piernas']).ej.some(e => e.id === 'copenhague'));
+  // descansos: básicos pesados ≥ 2 min, explosivos ≥ 90 s
+  for (const e of Object.values(L.GRUPOS).flatMap(G => G.ej)) if (e.p === 2 || e.p === 3 && !['remo_uni', 'landmine'].includes(e.id)) assert.ok(e.d >= 120, e.id);
+}
+
+// Cambiar un ejercicio: el sustituto ocupa el lugar con las mismas series, del mismo patrón, y se puede volver al original
+{
+  const base = L.armarRutina(60, ['piernas']), c = L.armarRutina(60, ['piernas'], 1, { hack: 'sent_copa' });
+  assert.deepEqual(c.ej.map(e => e.id), ['pm_hex', 'sent_copa', 'hip_thrust', 'nordico', 'copenhague']);
+  assert.equal(c.ej[1].s, base.ej[1].s); assert.equal(c.ej[1].orig, 'hack'); assert.equal(c.ej[1].d, 120);
+  const alt = L.alternativas(base.ej[1], base.ej); // hack
+  assert.equal(alt[0].id, 'sent_copa'); assert.ok(alt.every(x => x.p !== 1 && !base.ej.some(b => b.id === x.id)));
+  assert.equal(L.alternativas(base.ej[3], base.ej)[0].id, 'curl_fem');     // nórdico → curl femoral, no peso muerto
+  assert.equal(L.alternativas(base.ej[4], base.ej)[0].id, 'aduccion');     // Copenhague → aducción
+  const vuelta = L.sustituir(c.ej[1], 'hack'); assert.equal(vuelta.id, 'hack'); assert.equal(vuelta.orig, undefined);
+  assert.equal(L.alternativas(c.ej[1], c.ej)[0].id, 'hack');
+  // un explosivo solo se cambia por otro explosivo
+  const pot = L.armarRutina(90, ['potencia']); const caj = pot.ej.find(e => e.id === 'cajon');
+  assert.deepEqual(L.alternativas(caj, pot.ej).map(x => x.id), ['salto_vert']);
+  // los sustitutos no entran solos en las rutinas ni en el mapa muscular
+  assert.ok(!L.armarRutina(120, ['piernas', 'espalda', 'empuje', 'potencia']).ej.some(e => e.alt));
+  assert.ok(!L.ejerciciosDe('aductores').some(e => e.alt));
+}
+
+// Cuerpo completo A/B: cada sesión cubre bisagra/sentadilla, empuje y tracción; las dos juntas trabajan cada grupo 2 veces por semana
+{
+  const arma = (tipo, fase, min) => { const s = L.sesion(tipo, fase, min); return L.armarRutina(min, s.grupos, s.factor, {}, s.plantilla); };
+  const pats = r => new Set(r.ej.map(e => e.pat));
+  for (const [tipo, min] of [['fuerzaA', 75], ['fuerzaB', 60]]) {
+    const r = arma(tipo, 'construccion', min), p = pats(r);
+    assert.ok(['empuje_h', 'empuje_v'].some(x => p.has(x)) && ['traccion_h', 'traccion_v'].some(x => p.has(x)) && (p.has('bisagra') || p.has('sentadilla')), tipo);
+    assert.ok(r.ej.some(e => e.id === 'nordico' || e.id === 'copenhague'), tipo);   // prevención siempre
+    assert.equal(r.ej[0].p, 1);                                                     // explosivo primero
+  }
+  const gA = new Set(L.sesion('fuerzaA', 'base').grupos), gB = new Set(L.sesion('fuerzaB', 'base').grupos);
+  for (const g of ['piernas', 'espalda', 'empuje', 'brazos']) assert.ok(gA.has(g) && gB.has(g), g);
+  // Base: sin explosivos; con core en A y B. Construcción: explosivos y core solo en A
+  assert.ok(!arma('fuerzaA', 'base', 75).ej.some(e => e.p === 1) && L.sesion('fuerzaB', 'base').grupos.includes('core'));
+  assert.ok(arma('fuerzaB', 'construccion', 60).ej.some(e => e.p === 1) && !L.sesion('fuerzaB', 'construccion').grupos.includes('core'));
+  // Las sesiones con core piden 75 min para que entren todos los patrones
+  const dia = f => ({ fecha: f, d: L.dispDia([], f, { ahora: new Date('2026-10-26T06:00') }) });
+  const rd = L.distribuir('construccion', L.metasSemana('construccion'), ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30'].map(dia));
+  assert.deepEqual(rd.dias.filter(d => d.item?.tipo === 'fuerzaA' || d.item?.tipo === 'fuerzaB').map(d => [d.item.id, d.min >= (d.item.id === 'fuerzaA' ? 75 : 60)]).sort().map(x => x[1]), [true, true]);
+  // Descarga real: el volumen baja ≥ 40 % respecto de Construcción con las mismas cargas, y se mantienen A y B
+  const total = r => r.ej.reduce((n, e) => n + e.s, 0);
+  for (const tipo of ['fuerzaA', 'fuerzaB']) {
+    const c = total(arma(tipo, 'construccion', 90)), d = total(arma(tipo, 'descarga', 90));
+    assert.ok(d <= Math.round(c * .6), `${tipo}: ${d} vs ${c}`);
+    assert.ok(arma(tipo, 'descarga', 90).ej.some(e => e.id === 'nordico' || e.id === 'copenhague')); // la prevención no se quita
+  }
+  assert.deepEqual(L.metasSemana('descarga').filter(x => x.fija).map(x => x.id), ['fuerzaA', 'fuerzaB', 'rounds']);
+  assert.deepEqual(['base', 'construccion', 'especifica', 'descarga'].map(f => L.FASES[f].rpe), ['6-7', '7-8', '7-8', '6-7']);
+  // Modo libre: sigue intercalando grupos sin plantilla
+  assert.ok(L.armarRutina(90, ['espalda', 'empuje']).ej.length > 0);
+}

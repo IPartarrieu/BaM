@@ -1,7 +1,8 @@
 // Lógica pura (sin DOM) para poder probarla en Node: node tests/logic.test.mjs
 
 // Ejercicios de la rutina de Notion (🥋 Deporte). s=series, r=reps, d=descanso (s),
-// w=trabajo estimado por serie (s), kg=carga inicial (null = peso corporal).
+// w=trabajo estimado por serie (s), kg=carga inicial (null = peso corporal), p=prioridad en la sesión
+// (1 explosivo · 2 básico de piernas · 3 básico de tren superior · 4 prevención · 5 accesorio · 6 agarre; core al final), pat=patrón de movimiento.
 // Core: rutina fija de abdominales del usuario, 3 rondas con el mismo disco (solo cambia el peso).
 export const ABS = [
   { id: 'abs_disco', n: 'Abdominal alzando el disco sobre la cabeza', r: '20', m: ['abdominales', 'deltoides'] },
@@ -11,41 +12,49 @@ export const ABS = [
 ];
 export const GRUPOS = {
   piernas: { nombre: 'Piernas y cadera', icono: '🦵', ej: [
-    { id: 'pm_hex', n: 'Peso muerto barra hexagonal', s: 4, r: '5', d: 150, kg: 60, m: ['gluteos', 'isquios', 'cuadriceps', 'lumbares', 'trapecio', 'antebrazos'] },
-    { id: 'hack', n: 'Sentadilla en máquina Hack', s: 3, r: '8', d: 90, kg: 60, m: ['cuadriceps', 'gluteos', 'aductores'] },
-    { id: 'hip_thrust', n: 'Hip thrust', s: 3, r: '10', d: 90, kg: 60, m: ['gluteos', 'isquios'] },
-    { id: 'nordico', n: 'Curl nórdico (o femoral)', s: 3, r: '6', d: 90, kg: null, m: ['isquios', 'gemelos'] },
-    { id: 'copenhague', n: 'Plancha Copenhague', s: 3, r: '20 s', x: 'por lado', d: 60, kg: null, w: 50, m: ['aductores', 'oblicuos'] },
+    { id: 'pm_hex', n: 'Peso muerto barra hexagonal', s: 4, r: '4-6', d: 180, p: 2, pat: 'bisagra', kg: 60, m: ['gluteos', 'isquios', 'cuadriceps', 'lumbares', 'trapecio', 'antebrazos'] },
+    { id: 'hack', n: 'Sentadilla en máquina Hack', s: 3, r: '6-8', d: 120, p: 2, pat: 'sentadilla', kg: 60, m: ['cuadriceps', 'gluteos', 'aductores'] },
+    { id: 'hip_thrust', n: 'Hip thrust', s: 3, r: '8-10', d: 120, p: 2, pat: 'bisagra', kg: 60, m: ['gluteos', 'isquios'] },
+    { id: 'nordico', n: 'Curl nórdico (o femoral)', s: 3, r: '4-6', d: 120, p: 4, pat: 'flexion_rodilla', kg: null, m: ['isquios', 'gemelos'] },
+    { id: 'sent_copa', alt: true, n: 'Sentadilla goblet (mancuerna o kettlebell)', s: 3, r: '10', d: 120, p: 2, pat: 'sentadilla', kg: 20, m: ['cuadriceps', 'gluteos', 'aductores'] },
+    { id: 'rdl', alt: true, n: 'Peso muerto rumano con mancuernas', s: 3, r: '8', d: 120, p: 2, pat: 'bisagra', kg: 24, m: ['gluteos', 'isquios', 'lumbares'] },
+    { id: 'curl_fem', alt: true, n: 'Curl femoral tumbado en máquina o con banda', s: 3, r: '8', d: 120, p: 4, pat: 'flexion_rodilla', kg: 25, m: ['isquios', 'gemelos'] },
+    { id: 'aduccion', alt: true, n: 'Aducción en máquina o polea', s: 3, r: '12', x: 'por lado', d: 60, p: 4, pat: 'aductor', kg: 15, m: ['aductores'] },
+    { id: 'copenhague', n: 'Plancha Copenhague', s: 3, r: '20 s', x: 'por lado', d: 60, p: 4, pat: 'aductor', kg: null, w: 50, m: ['aductores', 'oblicuos'] },
   ]},
   espalda: { nombre: 'Espalda y tracción', icono: '🪢', ej: [
-    { id: 'jalon', n: 'Jalón al pecho', s: 4, r: '8', d: 90, kg: 45, m: ['dorsales', 'biceps', 'deltoides_post'] },
-    { id: 'remo_barra', n: 'Remo con barra', s: 4, r: '8', d: 90, kg: 40, m: ['dorsales', 'trapecio', 'deltoides_post', 'biceps', 'lumbares'] },
-    { id: 'face_pull', n: 'Face pull', s: 3, r: '15', d: 60, kg: 15, m: ['deltoides_post', 'trapecio'] },
-    { id: 'remo_uni', n: 'Remo unilateral mancuerna', s: 3, r: '10', x: 'por lado', d: 60, kg: 18, w: 60, m: ['dorsales', 'biceps', 'antebrazos'] },
+    { id: 'jalon', n: 'Jalón al pecho', s: 4, r: '6-8', d: 120, p: 3, pat: 'traccion_v', kg: 45, m: ['dorsales', 'biceps', 'deltoides_post'] },
+    { id: 'remo_barra', n: 'Remo con barra', s: 4, r: '6-8', d: 120, p: 3, pat: 'traccion_h', kg: 40, m: ['dorsales', 'trapecio', 'deltoides_post', 'biceps', 'lumbares'] },
+    { id: 'face_pull', n: 'Face pull', s: 3, r: '12-15', d: 75, p: 5, pat: 'traccion_h', kg: 15, m: ['deltoides_post', 'trapecio'] },
+    { id: 'dominadas', alt: true, n: 'Dominadas (asistidas si hace falta)', s: 3, r: '6', d: 120, p: 3, pat: 'traccion_v', kg: null, m: ['dorsales', 'biceps', 'antebrazos'] },
+    { id: 'remo_uni', n: 'Remo unilateral mancuerna', s: 3, r: '8-10', x: 'por lado', d: 60, p: 3, pat: 'traccion_h', kg: 18, w: 60, m: ['dorsales', 'biceps', 'antebrazos'] },
   ]},
   empuje: { nombre: 'Pecho y hombros', icono: '🛡️', ej: [
-    { id: 'press_incl', n: 'Press banca inclinado', s: 4, r: '8', d: 120, kg: 40, m: ['pectorales', 'deltoides', 'triceps'] },
-    { id: 'militar', n: 'Press militar de pie', s: 3, r: '8', d: 90, kg: 30, m: ['deltoides', 'triceps', 'trapecio'] },
-    { id: 'fondos', n: 'Fondos', s: 3, r: '8-12', d: 90, kg: 0, m: ['pectorales', 'triceps', 'deltoides'] },
-    { id: 'landmine', n: 'Landmine press con rotación', s: 4, r: '5', x: 'por lado', d: 90, kg: 20, w: 50, m: ['deltoides', 'pectorales', 'oblicuos', 'triceps'] },
+    { id: 'press_incl', n: 'Press banca inclinado', s: 4, r: '6-8', d: 150, p: 3, pat: 'empuje_h', kg: 40, m: ['pectorales', 'deltoides', 'triceps'] },
+    { id: 'militar', n: 'Press militar de pie', s: 3, r: '6-8', d: 120, p: 3, pat: 'empuje_v', kg: 30, m: ['deltoides', 'triceps', 'trapecio'] },
+    { id: 'press_manc', alt: true, n: 'Press inclinado con mancuernas', s: 3, r: '8', d: 120, p: 3, pat: 'empuje_h', kg: 16, m: ['pectorales', 'deltoides', 'triceps'] },
+    { id: 'militar_manc', alt: true, n: 'Press militar con mancuernas sentado', s: 3, r: '8', d: 120, p: 3, pat: 'empuje_v', kg: 12, m: ['deltoides', 'triceps'] },
+    { id: 'fondos', n: 'Fondos', s: 3, r: '8-12', d: 120, p: 3, pat: 'empuje_h', kg: 0, m: ['pectorales', 'triceps', 'deltoides'] },
+    { id: 'landmine', n: 'Landmine press con rotación', s: 4, r: '5-8', x: 'por lado', d: 90, p: 3, pat: 'empuje_v', kg: 20, w: 50, m: ['deltoides', 'pectorales', 'oblicuos', 'triceps'] },
   ]},
   brazos: { nombre: 'Brazos y agarre', icono: '✊', ej: [
-    { id: 'curl_mart', n: 'Curl martillo', s: 3, r: '12', d: 60, kg: 10, m: ['biceps', 'antebrazos'] },
-    { id: 'curl_rev', n: 'Curl reverso', s: 3, r: '12', d: 60, kg: 15, m: ['antebrazos', 'biceps'] },
-    { id: 'pinch', n: 'Pinch grip con discos', s: 3, r: '30 s', d: 45, kg: 10, m: ['antebrazos'] },
-    { id: 'colgarse', n: 'Colgarse del gi o toalla', s: 3, r: 'máx', d: 60, kg: null, w: 45, m: ['antebrazos', 'dorsales'] },
-    { id: 'farmer', n: 'Farmer carry 30 m', s: 4, r: '1', d: 60, kg: 24, m: ['antebrazos', 'trapecio', 'abdominales'] },
+    { id: 'curl_mart', n: 'Curl martillo', s: 3, r: '10-12', d: 75, p: 5, pat: 'flexion_codo', kg: 10, m: ['biceps', 'antebrazos'] },
+    { id: 'curl_rev', n: 'Curl reverso', s: 3, r: '10-12', d: 75, p: 5, pat: 'flexion_codo', kg: 15, m: ['antebrazos', 'biceps'] },
+    { id: 'pinch', n: 'Pinch grip con discos', s: 3, r: '30 s', d: 60, p: 6, pat: 'agarre', kg: 10, m: ['antebrazos'] },
+    { id: 'colgarse', n: 'Colgarse del gi o toalla', s: 3, r: 'máx', d: 90, p: 6, pat: 'agarre', kg: null, w: 45, m: ['antebrazos', 'dorsales'] },
+    { id: 'farmer', n: 'Farmer carry 30 m', s: 4, r: '1', d: 90, p: 6, pat: 'agarre', kg: 24, m: ['antebrazos', 'trapecio', 'abdominales'] },
   ]},
   core: { nombre: 'Core', icono: '🔥', fija: true, ej: ABS },
   potencia: { nombre: 'Potencia y gas', icono: '⚡', ej: [
-    { id: 'swing', n: 'Swing con kettlebell', s: 5, r: '10', d: 60, kg: 16, m: ['gluteos', 'isquios', 'lumbares', 'abdominales'] },
-    { id: 'cajon', n: 'Salto al cajón', s: 4, r: '4', d: 90, kg: null, w: 20, m: ['cuadriceps', 'gluteos', 'gemelos'] },
-    { id: 'balon_rot', n: 'Lanzamiento rotacional balón medicinal', s: 3, r: '6', x: 'por lado', d: 60, kg: 4, m: ['oblicuos', 'abdominales', 'deltoides'] },
-    { id: 'remo_maq', n: 'Remo en máquina 250 m', s: 4, r: '1', d: 90, kg: null, w: 60, m: ['dorsales', 'cuadriceps', 'gluteos', 'biceps'] },
+    { id: 'swing', n: 'Swing con kettlebell', s: 5, r: '10', d: 90, p: 1, pat: 'bisagra', kg: 16, m: ['gluteos', 'isquios', 'lumbares', 'abdominales'] },
+    { id: 'salto_vert', alt: true, n: 'Salto vertical en el lugar', s: 4, r: '4', d: 150, p: 1, pat: 'salto', kg: null, w: 20, m: ['cuadriceps', 'gluteos', 'gemelos'] },
+    { id: 'cajon', n: 'Salto al cajón', s: 4, r: '4', d: 150, p: 1, pat: 'salto', kg: null, w: 20, m: ['cuadriceps', 'gluteos', 'gemelos'] },
+    { id: 'balon_rot', n: 'Lanzamiento rotacional balón medicinal', s: 3, r: '6', x: 'por lado', d: 90, p: 1, pat: 'rotacion', kg: 4, m: ['oblicuos', 'abdominales', 'deltoides'] },
+    { id: 'remo_maq', n: 'Remo en máquina 250 m', s: 4, r: '1', d: 90, p: 5, pat: 'traccion_h', kg: null, w: 60, m: ['dorsales', 'cuadriceps', 'gluteos', 'biceps'] },
   ]},
 };
 
-export const CALENTAMIENTO = ['Círculos de cuello, brazos, cintura y piernas', '90/90 de cadera × 8', 'Estiramiento de espalda', 'Calentamiento de piernas con banda elástica'];
+export const CALENTAMIENTO = ['Círculos de cuello, brazos, cintura y piernas', '90/90 de cadera × 8', 'Gato-camello y rotación torácica × 8', 'Calentamiento de piernas con banda elástica'];
 export const ELONGACION = ['Rana (aductores)', '90/90 sostenido por lado', 'Puente de lucha suave', 'Apertura torácica en el suelo', 'Isquios y psoas por lado'];
 
 export const ABS_RONDAS = 3, ABS_DESC_EJ = 5, ABS_DESC_RONDA = 90;
@@ -64,42 +73,100 @@ export const MUSCULOS = {
 
 // Ejercicios que trabajan un músculo, con su grupo.
 export const ejerciciosDe = musculo => Object.entries(GRUPOS)
-  .flatMap(([g, G]) => G.ej.map(e => ({ ...e, g })))
+  .flatMap(([g, G]) => G.ej.filter(e => !e.alt).map(e => ({ ...e, g })))
   .filter(e => e.m.includes(musculo));
+
+// Cuerpo completo A/B: así cada grupo muscular se entrena 2 veces por semana (con ejercicios distintos).
+// [id, series]; sin series, las del ejercicio. Los explosivos (p 1) solo desde la fase Construcción.
+export const PLANTILLAS = {
+  A: [['swing', 3], ['pm_hex', 3], ['press_incl', 3], ['jalon', 3], ['nordico', 2], ['curl_mart', 2], ['colgarse', 2]],
+  B: [['cajon', 3], ['hack', 3], ['militar', 3], ['remo_barra', 3], ['copenhague', 2], ['face_pull', 2], ['farmer', 2]],
+};
 
 const costo = (e, s) => s * ((e.w ?? 40) + e.d) + CAMBIO_SEG;
 
 // Core es fijo (rondas de ABS); el resto alterna sus ejercicios y llena el tiempo disponible.
 // Si un ejercicio no cabe completo, prueba con menos series (mínimo 2).
 // factor: fracción de las series según la fase del plan (base 0,75, descarga 0,6).
-export function armarRutina(minutos, grupos, factor = 1) {
+// plantilla: { k: 'A' | 'B', potencia } arma la sesión de cuerpo completo del plan; sin ella, intercala los grupos elegidos.
+// cambios: { idOriginal: idSustituto } para ejercicios que no se pueden hacer (máquina ocupada, dolor, falta de equipo).
+// El sustituto ocupa el lugar del original con sus mismas series.
+export function armarRutina(minutos, grupos, factor = 1, cambios = {}, plantilla = null) {
   const conAbs = grupos.includes('core');
   let libre = minutos * 60 - FIJO_SEG - (conAbs ? ABS_SEG : 0);
-  const listas = grupos.filter(g => !GRUPOS[g].fija).map(g => GRUPOS[g].ej.map(e => ({ ...e, g, s: Math.max(2, Math.round(e.s * factor)) })));
+  const escala = e => ({ ...e, s: Math.max(2, Math.round(e.s * factor)) });
   const orden = [];
-  for (let i = 0; listas.some(l => i < l.length); i++) listas.forEach(l => l[i] && orden.push(l[i]));
-  const ej = [];
-  for (const e of orden) {
-    for (let s = e.s; s >= 2; s--) {
-      if (costo(e, s) <= libre) { ej.push({ ...e, s }); libre -= costo(e, s); break; }
+  if (plantilla) {
+    PLANTILLAS[plantilla.k].forEach(([id, s]) => { const e = ejDe(id); if (plantilla.potencia || e.p !== 1) orden.push(escala({ ...e, s: s ?? e.s })); });
+    // Descarga (factor < 0,7): tope de series totales = factor × las de la sesión completa, quitando desde el final (accesorios y agarre
+    // pueden salir; el resto queda en 2 series como mínimo). Si no, el tiempo sobrante se llenaría y el volumen no bajaría.
+    if (factor < .7) {
+      const tope = Math.round(PLANTILLAS[plantilla.k].filter(([id]) => plantilla.potencia || ejDe(id).p !== 1).reduce((n, [id, s]) => n + (s ?? ejDe(id).s), 0) * factor);
+      let total = orden.reduce((n, e) => n + e.s, 0);
+      for (const e of [...orden].reverse()) { while (total > tope && e.s > (e.p >= 5 ? 0 : 2)) { e.s--; total--; } }
+      orden.splice(0, orden.length, ...orden.filter(e => e.s > 0));
     }
   }
+  else {
+    const listas = grupos.filter(g => !GRUPOS[g].fija).map(g => GRUPOS[g].ej.filter(e => !e.alt).map(e => escala({ ...e, g })));
+    for (let i = 0; listas.some(l => i < l.length); i++) listas.forEach(l => l[i] && orden.push(l[i]));
+  }
+  orden.sort((a, b) => a.p - b.p); // por prioridad (el sort es estable: dentro de cada una queda el intercalado de grupos)
+  // Si falta tiempo se recorta desde el final; la prevención (nórdico, Copenhague) reserva 2 series (hasta el 40 % del tiempo) antes de repartir el resto.
+  const mete = (e, disp) => { for (let s = e.s; s >= 2; s--) if (costo(e, s) <= disp) return s; return 0; };
+  const prev = orden.filter(e => e.p === 4), minPrev = es => es.reduce((n, e) => n + costo(e, 2), 0);
+  const hechas = new Map(), reserva = Math.min(minPrev(prev), libre * .4);
+  for (const e of orden.filter(e => e.p !== 4)) { const s = mete(e, libre - reserva); if (s) { hechas.set(e.id, s); libre -= costo(e, s); } }
+  prev.forEach((e, i) => { const s = mete(e, libre - minPrev(prev.slice(i + 1))); if (s) { hechas.set(e.id, s); libre -= costo(e, s); } });
+  const ej = orden.filter(e => hechas.has(e.id)).map(e => sustituir(e, cambios[e.id], hechas.get(e.id)));
   return { ej, conAbs, sobraMin: Math.max(0, Math.floor(libre / 60)) };
+}
+
+const ejDe = id => Object.entries(GRUPOS).flatMap(([g, G]) => G.fija ? [] : G.ej.map(e => ({ ...e, g }))).find(e => e.id === id);
+
+// El sustituto toma el lugar de `e` (mismas series); `orig` guarda el ejercicio original para poder volver.
+export function sustituir(e, idNuevo, s = e.s) {
+  const n = idNuevo && idNuevo !== (e.orig ?? e.id) ? ejDe(idNuevo) : ejDe(e.orig ?? e.id);
+  if (!n) return { ...e, s };
+  return { ...n, s, orig: n.id === (e.orig ?? e.id) ? undefined : (e.orig ?? e.id) };
+}
+
+// Opciones para reemplazar `e` sin cambiar lo que entrena: del mismo grupo o de otro con ≥ 2 músculos en común, que no
+// estén ya en la rutina; primero el mismo patrón de movimiento, luego la misma prioridad, luego más músculos en común.
+// Un explosivo solo se cambia por otro explosivo (y un básico nunca por uno). Si ya está cambiado, incluye el original.
+export function alternativas(e, enRutina) {
+  const usados = new Set(enRutina.map(x => x.id)), base = ejDe(e.orig ?? e.id) ?? e;
+  const comp = x => x.m.filter(m => base.m.includes(m)).length;
+  return Object.entries(GRUPOS).flatMap(([g, G]) => G.fija ? [] : G.ej.map(x => ({ ...x, g })))
+    .filter(x => x.id === base.id ? e.orig : !usados.has(x.id) && (x.p === 1) === (base.p === 1) && (x.g === base.g || comp(x) >= 2))
+    .sort((a, b) => (b.id === base.id) - (a.id === base.id) || (b.pat === base.pat) - (a.pat === base.pat) || (b.p === base.p) - (a.p === base.p) || comp(b) - comp(a));
 }
 
 export const tope = r => Math.max(...(String(r).match(/\d+/g) || [0]).map(Number));
 
-// Doble progresión (Notion): si en la última sesión se llegó al tope de reps en todas las series, +2,5 kg.
-export function sugerirKg(sesiones, e) {
+export const piso = r => Math.min(...(String(r).match(/\d+/g) || [0]).map(Number));
+// Subida de carga proporcional (≈ 5 %, entre 1 y 2,5 kg): 2-10 % según ACSM.
+export const paso = kg => Math.min(2.5, Math.max(1, Math.round(kg * .05 * 2) / 2));
+
+// Doble progresión: se sube la carga solo si en la última sesión se llegó al tope del rango de repeticiones en todas las
+// series Y el esfuerzo (RPE de la sesión) no pasó del objetivo de la fase. Los explosivos (p 1) mantienen la carga.
+export function sugerirKg(sesiones, e, rpeMax = 8) {
   for (let i = sesiones.length - 1; i >= 0; i--) {
     const series = sesiones[i].series.filter(x => x.ex === e.id);
     if (!series.length) continue;
     const kg = Math.max(...series.map(x => +x.kg || 0));
     const t = tope(e.r);
     const completo = t > 1 && !/s$/.test(e.r) && series.length >= e.s && series.every(x => +x.reps >= t);
-    return completo && e.kg !== null ? kg + 2.5 : kg;
+    const facil = !sesiones[i].rpe || sesiones[i].rpe <= rpeMax;
+    return completo && facil && e.kg !== null && e.p !== 1 ? Math.round((kg + paso(kg)) * 2) / 2 : kg;
   }
   return e.kg;
+}
+
+// Series de aproximación (no cuentan como series de trabajo): 50 % × 5, 70 % × 3 y 85 % × 1 de la carga del día.
+export function aproximacion(kg, n = 3) {
+  if (!(kg >= 20)) return [];
+  return [[.5, 5], [.7, 3], [.85, 1]].slice(0, n).map(([f, reps]) => ({ kg: Math.round(kg * f / 2.5) * 2.5, reps }));
 }
 
 // 'YYYY-MM-DD' a mediodía local (new Date('YYYY-MM-DD') es UTC y en Chile cae el día anterior).
@@ -213,18 +280,18 @@ export const MOVILIDAD = ['Cuello: isometría 4 direcciones · 3 × 10 s', 'Puen
 export const ROUND = ['Sprawl × 5', 'Escape de cadera ida y vuelta', 'Swing kettlebell × 10', 'Oso (bear crawl) 10 m', 'Levantada técnica × 4', 'Burpee × 5'];
 
 export const FASES = {
-  base: { n: 'Base', factor: .75, B: ['empuje', 'brazos', 'core'], z2: 35,
-    obj: 'Adaptar tendones y articulaciones y construir la base aeróbica. Fuerza con 2–3 repeticiones en reserva (RPE 6–7); cardio en Z2.',
+  base: { n: 'Base', factor: .75, rpe: '6-7', z2: 35,
+    obj: 'Adaptar tendones y articulaciones y construir la base aeróbica. Fuerza con 3–4 repeticiones en reserva (RPE 6–7); cardio en Z2.',
     fijas: ['fuerzaA', 'fuerzaB', 'z2'], variables: ['z2', 'movilidad'] },
-  construccion: { n: 'Construcción', factor: 1, B: ['empuje', 'brazos', 'potencia'], z2: 40,
+  construccion: { n: 'Construcción', factor: 1, rpe: '7-8', z2: 40,
     obj: 'Subir la carga (RPE 7–8) y sumar intervalos en Z4 para la potencia aeróbica.',
     fijas: ['fuerzaA', 'fuerzaB', 'intervalos'], variables: ['z2', 'movilidad'] },
-  especifica: { n: 'Específica BJJ', factor: .85, B: ['empuje', 'brazos', 'potencia'], z2: 40, rounds: 6,
+  especifica: { n: 'Específica BJJ', factor: .85, rpe: '7-8', z2: 40, rounds: 6,
     obj: 'Simular la lucha: rounds de 5 min de trabajo continuo en Z4–Z5 con 1 min de pausa. La fuerza se mantiene.',
     fijas: ['fuerzaA', 'fuerzaB', 'rounds'], variables: ['z2', 'rounds'] },
-  descarga: { n: 'Descarga', factor: .6, B: ['empuje', 'brazos', 'potencia'], z2: 30, rounds: 3,
-    obj: 'Bajar el volumen ~40 % y mantener la intensidad para llegar descansado a la meta.',
-    fijas: ['fuerzaA', 'rounds'], variables: ['z2', 'movilidad'] },
+  descarga: { n: 'Descarga', factor: .6, rpe: '6-7', z2: 30, rounds: 3,
+    obj: 'Bajar el volumen ~40 % (menos series) y mantener la intensidad (mismas cargas, RPE 6–7) y la frecuencia (A y B) para llegar descansado a la meta.',
+    fijas: ['fuerzaA', 'fuerzaB', 'rounds'], variables: ['z2', 'movilidad'] },
 };
 
 // Fase de la semana s (0 = la del inicio) en un plan de `total` semanas; la última es descarga si hay ≥ 3.
@@ -252,8 +319,11 @@ export const segBloques = b => b.reduce((a, x) => a + x.seg, 0);
 // Una sesión del plan ajustada a los minutos disponibles.
 export function sesion(tipo, fase, min = 60) {
   const F = FASES[fase];
-  if (tipo === 'fuerzaA') return { tipo: 'fuerza', i: '🏋️', n: 'Fuerza A · piernas y espalda', min, grupos: ['piernas', 'espalda', 'core'], factor: F.factor, dura: true };
-  if (tipo === 'fuerzaB') return { tipo: 'fuerza', i: '🏋️', n: `Fuerza B · empuje, agarre y ${F.B[2] === 'core' ? 'core' : 'potencia'}`, min, grupos: F.B, factor: F.factor, dura: true };
+  if (tipo === 'fuerzaA' || tipo === 'fuerzaB') { // cuerpo completo; core en A siempre y en B solo en Base (después entran los explosivos)
+    const k = tipo.slice(-1), potencia = fase !== 'base';
+    return { tipo: 'fuerza', i: '🏋️', n: `Fuerza ${k} · cuerpo completo`, min, plantilla: { k, potencia }, factor: F.factor, rpe: F.rpe, dura: true,
+      grupos: ['piernas', 'espalda', 'empuje', 'brazos', ...(k === 'A' || !potencia ? ['core'] : []), ...(potencia ? ['potencia'] : [])] };
+  }
   if (tipo === 'z2') {
     const m = Math.min(F.z2, min);
     return { tipo, i: '🫁', n: 'Cardio base Z2', modo: 'Trote, bici, remo o elíptica', min: m, bloques: [{ seg: m * 60, z: 2, txt: 'Z2 continuo' }] };
@@ -328,7 +398,8 @@ export const horaHabitual = eventos => {
   const c = {}; for (const e of eventos.filter(e => esBloque(e.t || ''))) { const h = hhmm(+dia(e.ini)); c[h] = (c[h] || 0) + 1; }
   return Object.keys(c).sort((a, b) => c[b] - c[a])[0] ?? '19:30';
 };
-const minimo = (tipo, fase) => tipo.startsWith('fuerza') ? 60 : minSesion(sesion(tipo, fase));
+// Cuerpo completo: 60 min sin core; con core (A siempre, B en Base) 75 min, para que entren todos los patrones.
+const minimo = (tipo, fase) => tipo.startsWith('fuerza') ? (sesion(tipo, fase).grupos.includes('core') ? 75 : 60) : minSesion(sesion(tipo, fase));
 
 // Reparte lo pendiente en los días que quedan. dias: [{fecha, d: dispDia, elegido?: {item, hora, min}, hecho?}].
 // Primero lo que el usuario fijó para el día; luego las fijas y después las variables, en el primer día donde quepan,
@@ -480,4 +551,56 @@ export function racha(basicos, hoy = iso(new Date())) {
     run = prev && sumarDias(prev, 1) === d ? run + 1 : 1; mejor = Math.max(mejor, run); prev = d;
   }
   return { actual: n, mejor };
+}
+
+// ---------- Estimar una comida sin pesar (porciones típicas) ----------
+// [patrón, kcal/100 g, proteína/100 g, g por unidad (huevo, rebanada, presa…), g por plato/porción].
+// Valores de tablas de composición (USDA / INTA Chile) para preparaciones cocidas; son orientativos (±20 %).
+const COMUN = [
+  [/huevo/, 143, 12.6, 50, 100], [/pechuga|pollo|presa|pavo asado/, 165, 31, 120, 150], [/cerdo|chancho|costilla|lomo liso/, 240, 26, 120, 150],
+  [/carne|vacuno|posta|lomo|bife|churrasco|asado|filete|molida|albondiga/, 215, 26, 120, 150], [/salmon/, 208, 20, 120, 150],
+  [/atun/, 116, 26, 120, 120], [/merluza|reineta|pescado|congrio|pejerrey|jurel/, 105, 20, 120, 150], [/jamon|pavo|fiambre/, 105, 17, 20, 60],
+  [/quesillo|queso fresco|ricota/, 160, 12, 30, 60], [/queso/, 350, 25, 25, 50], [/yogur.*griego|griego/, 100, 9, 125, 150], [/yogur|yogurt/, 65, 4, 125, 150],
+  [/leche/, 60, 3.2, 200, 200], [/marraqueta|batido/, 275, 9, 90, 90], [/hallulla/, 300, 9, 85, 85], [/pan|tostada|sandwich de molde/, 265, 9, 40, 80],
+  [/arroz/, 130, 2.7, 160, 200], [/fideo|tallarin|pasta|espagueti|spaghetti|macarron|ravioles/, 158, 5.8, 160, 220],
+  [/papas? fritas|fritas/, 312, 3.4, 120, 120], [/pure/, 100, 2, 150, 200], [/papa|camote/, 87, 2, 150, 200],
+  [/poroto|lenteja|garbanzo|legumbre/, 120, 8, 150, 250], [/avena/, 75, 3, 250, 250], [/cereal/, 380, 8, 30, 40], [/platano|banana/, 89, 1.1, 120, 120],
+  [/manzana|pera|durazno/, 55, .4, 170, 170], [/naranja|mandarina|kiwi|fruta|uva|sandia|melon|frutilla|arandano/, 50, .8, 120, 150], [/palta|aguacate/, 160, 2, 100, 100],
+  [/aceite|mantequilla|margarina/, 800, 0, 14, 14], [/mani|nuez|nueces|almendra|castana|pistacho|frutos secos/, 600, 21, 30, 30],
+  [/hamburguesa/, 295, 15, 200, 200], [/completo|hot dog|italiano/, 270, 9, 250, 250], [/sandwich|sanguche|churrasco italiano/, 250, 11, 180, 180],
+  [/pizza/, 270, 11, 110, 220], [/empanada/, 220, 7.5, 140, 140], [/pastel de choclo/, 180, 8, 350, 350], [/lasana/, 160, 8, 300, 300],
+  [/charquican/, 110, 6, 350, 350], [/cazuela|sopa|caldo|crema/, 70, 5, 400, 400], [/ensalada|verdura|tomate|lechuga|brocoli|zapallo/, 30, 1.5, 150, 150],
+  [/proteina en polvo|whey|scoop/, 380, 75, 30, 30], [/chocolate/, 540, 6, 20, 40], [/galleta/, 450, 6, 12, 40], [/helado/, 200, 3.5, 100, 100],
+  [/bebida|gaseosa|coca|jugo|cerveza/, 43, .3, 350, 350], [/vino/, 85, .1, 150, 150],
+];
+const CANT = { un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, medio: .5, media: .5 };
+const UNID = { plato: 'p', platos: 'p', porcion: 'p', porciones: 'p', racion: 'p', raciones: 'p', taza: 150, tazas: 150, cucharada: 14, cucharadas: 14,
+  cucharadita: 5, cucharaditas: 5, vaso: 200, vasos: 200, copa: 150, copas: 150, punado: 30, punados: 30 };
+const sinTilde = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+// items = [{t, g}] (g opcional). Devuelve { kcal, prot, txt, nota, sinReconocer }.
+export function estimarTexto(items) {
+  const partes = [], sin = [];
+  for (const it of items) {
+    const g = +String(it.g).replace(',', '.') || 0;
+    const segs = String(it.t).split(/,|;|\n|\sy\s|\scon\s|\s\+\s/).map(x => x.trim()).filter(Boolean);
+    for (const seg of segs) {
+      let t = sinTilde(seg), gr = g && segs.length === 1 ? g : 0, q = 1, x;
+      if (!gr && (x = t.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|grs|gramos|ml)\b/))) { gr = +x[1].replace(',', '.'); t = t.replace(x[0], ' '); }
+      if ((x = t.match(/^(\d+)\/(\d+)\s/))) { q = +x[1] / +x[2]; t = t.slice(x[0].length); }
+      else if ((x = t.match(/^(\d+(?:[.,]\d+)?)\s*/))) { q = +x[1].replace(',', '.'); t = t.slice(x[0].length); }
+      else if ((x = t.match(/^(\S+)\s/)) && CANT[x[1]] !== undefined) { q = CANT[x[1]]; t = t.slice(x[0].length); }
+      const u = t.match(/^(\S+)\s+(?:de |del )?/), unidad = u && UNID[u[1]];
+      if (unidad) t = t.slice(u[0].length);
+      const f = COMUN.find(c => c[0].test(t));
+      if (!f) { sin.push(seg); continue; }
+      const mult = /\b(grande|grandes|doble)\b/.test(t) ? 1.3 : /\b(chico|chica|chicos|pequeno|pequena|mini)\b/.test(t) ? .7 : 1;
+      const base = unidad === 'p' ? f[4] : unidad ? unidad : (f[3] || f[4]);
+      const gramos = Math.round(gr || q * base * mult);
+      partes.push({ txt: seg, gramos, kcal: gramos * f[1] / 100, prot: gramos * f[2] / 100, medido: !!gr });
+    }
+  }
+  const nota = partes.length ? `Estimado con porciones típicas: ${partes.map(p => `${p.txt} ≈ ${p.gramos} g${p.medido ? '' : '*'}`).join(', ')}.${partes.some(p => !p.medido) ? ' (* sin pesar)' : ''}` : '';
+  return { kcal: Math.round(partes.reduce((a, p) => a + p.kcal, 0)), prot: Math.round(partes.reduce((a, p) => a + p.prot, 0)),
+    txt: partes.map(p => p.txt).join(', '), nota, sinReconocer: sin };
 }
