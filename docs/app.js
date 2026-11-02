@@ -177,6 +177,7 @@ function cardMapa() {
     ${info}</div>`;
 }
 
+const stat = (v, t) => `<div><div style="font-size:26px;font-weight:700">${v}</div><div class="sub">${t}</div></div>`;
 function tarjetaLunes() {
   const r = L.resumenAnterior(db.sesiones), dif = r.sesiones - r.antes;
   return `<div class="card" style="border:2px solid var(--ac)"><h2>📅 Tu semana pasada</h2>
@@ -486,7 +487,6 @@ function vistaAvance() {
   const r = L.resumenSemana(db.sesiones), nv = L.niveles(db.sesiones);
   const conKg = [...new Set(db.sesiones.flatMap(s => s.series.filter(x => x.kg !== null && x.kg !== undefined).map(x => x.ex)))];
   if (!conKg.includes(exSel)) exSel = conKg[0];
-  const stat = (v, t) => `<div><div style="font-size:26px;font-weight:700">${v}</div><div class="sub">${t}</div></div>`;
   return `<h1>Avance semanal</h1>
   <div class="card"><div class="fila" style="justify-content:space-around;text-align:center">${stat(`${r.sesiones}/${L.META}`, 'sesiones')}${stat(r.minutos, 'minutos')}${stat(r.series, 'series')}</div></div>
   <div class="card"><h2>Nivel por grupo <span class="sub">· últimas 4 semanas</span></h2>${radar(nv)}</div>
