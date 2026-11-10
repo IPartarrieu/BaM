@@ -309,7 +309,7 @@ function vistaEntreno() {
   const total = a.ej.reduce((n, e) => n + e.s, 0) + (a.abs ? L.ABS_RONDAS * L.ABS.length : 0);
   const hechas = Object.keys(a.hechos).length;
   return `<h1>${a.plantilla ? `🏋️ Fuerza ${a.plantilla.k} · cuerpo completo` : a.grupos.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' + ')}</h1>
-  <div class="sub">Plan ${a.min} min · <span id="reloj">${transcurrido()}</span> · ${hechas}/${total} series${a.rpe ? ` · esfuerzo objetivo RPE ${a.rpe}` : ''}</div>
+  <div class="sub">Plan ${a.min} min · <span id="reloj">${transcurrido()}</span> · ${hechas}/${total} series · ${fmtKg(L.tonelaje(seriesHechas(a)))}${a.rpe ? ` · esfuerzo objetivo RPE ${a.rpe}` : ''}</div>
   <div class="barra"><i style="width:${hechas / total * 100}%"></i></div>
   ${bloqueFijo('cal', '1 · Calentamiento de articulaciones', L.CALENTAMIENTO)}
   ${a.ej.map((e, i) => tarjetaEj(e, i)).join('')}
@@ -321,6 +321,12 @@ function vistaEntreno() {
   <button class="btn sec" data-act="cancelar">Descartar sesión</button>`;
 }
 
+const seriesHechas = a => Object.entries(a.hechos).map(([k, h]) => {
+  if (k.startsWith('abs:')) return { ex: L.ABS[+k.split(':')[2]].id, g: 'core', kg: +String(a.absKg).replace(',', '.') || 0, reps: 20 };
+  const e = a.ej.find(x => x.id === k.split(':')[0]);
+  return { ex: e.id, g: e.g, kg: e.kg === null ? null : +String(h.kg).replace(',', '.') || 0, reps: +h.reps || 0 };
+});
+const fmtKg = n => Math.round(n).toLocaleString('es-CL') + ' kg';
 const mmss = seg => `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
 function vistaCardio() {
   const a = db.actual, ses = a.ses, zs = L.zonas(db.perfil);
@@ -513,6 +519,16 @@ function datosIA() {
     sesiones: db.sesiones.slice(-10).map(x => ({ fecha: x.fecha, tipo: x.tipo, grupos: x.grupos, min: x.min })) };
 }
 
+function vistaTonelaje() {
+  const T = L.tonelajeMedio(db.sesiones), ult = db.sesiones.filter(x => L.tonelaje(x.series) > 0).at(-1);
+  if (!T.sesiones) return '<div class="sub">Aparecerá cuando termines una sesión con peso.</div>';
+  const tope = Math.max(...Object.values(T.grupos).map(x => x.media));
+  return `<div class="fila" style="justify-content:space-around;text-align:center">${stat(fmtKg(L.tonelaje(ult.series)), 'última sesión')}${stat(fmtKg(T.media), `media · ${T.sesiones} ${T.sesiones > 1 ? 'sesiones' : 'sesión'}`)}</div>
+  <div class="sub" style="margin:10px 0 4px">Media por sesión y grupo</div>
+  ${Object.entries(T.grupos).sort((a, b) => b[1].media - a[1].media).map(([g, x]) => `<div style="margin:6px 0"><div class="fila sub" style="justify-content:space-between"><span>${nombreGrupo(g)}</span><span>${fmtKg(x.media)} · ${x.sesiones} ses.</span></div><div class="barra"><i style="width:${x.media / tope * 100}%;background:${COLOR[g] ?? '#4c8dff'}"></i></div></div>`).join('')}
+  ${grafico(db.sesiones.map(x => ({ fecha: x.fecha, kg: Math.round(L.tonelaje(x.series)) })).filter(p => p.kg > 0), 'kg levantados por sesión')}`;
+}
+
 function vistaAvance() {
   const r = L.resumenSemana(db.sesiones), nv = L.niveles(db.sesiones);
   const conKg = [...new Set(db.sesiones.flatMap(s => s.series.filter(x => x.kg !== null && x.kg !== undefined).map(x => x.ex)))];
@@ -520,13 +536,14 @@ function vistaAvance() {
   return `<h1>Avance semanal</h1>
   <div class="card"><div class="fila" style="justify-content:space-around;text-align:center">${stat(`${r.sesiones}/${L.META}`, 'sesiones')}${stat(r.minutos, 'minutos')}${stat(r.series, 'series')}</div></div>
   <div class="card"><h2>Nivel por grupo <span class="sub">· últimas 4 semanas</span></h2>${radar(nv)}</div>
+  <div class="card"><h2>Kilos levantados <span class="sub">· como Heavy: kg × reps</span></h2>${vistaTonelaje()}</div>
   <div class="card"><h2>Evolución de la carga</h2>${conKg.length
     ? `<select data-act="exsel">${conKg.map(id => `<option value="${esc(id)}" ${id === exSel ? 'selected' : ''}>${esc(nombreEj(id))}</option>`).join('')}</select>${grafico(L.serieKg(db.sesiones, exSel))}`
     : '<div class="sub">Aparecerá cuando registres series con peso.</div>'}</div>
   <div class="card"><h2>Logros de la semana</h2>${L.logros(db.sesiones).map(l => `<div class="logro ${l.ok ? 'ok' : ''}"><b>${l.i}</b><span>${l.t}</span></div>`).join('')}</div>
   <div class="card"><h2>Historial</h2>${db.sesiones.slice(-10).reverse().map(s => `<div style="padding:6px 0;border-bottom:1px solid var(--panel2)">
     <b>${new Date(s.fecha).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' })}</b> · ${s.tipo && s.tipo !== 'fuerza' ? ICONO[s.tipo] ?? '' : (s.grupos || []).map(g => L.GRUPOS[g]?.icono ?? '').join(' ')}
-    <span class="sub">· ${esc(s.duracionMin)} min${s.tipo && s.tipo !== 'fuerza' ? '' : ` · ${s.series.length} series`}${s.rpe ? ` · RPE ${esc(s.rpe)}` : ''}${s.fcProm ? ` · ${esc(s.fcProm)} lpm` : ''}${s.abs ? ' · abs' : ''}${s.clima ? ' · ' + esc(s.clima.txt) : ''}</span></div>`).join('') || '<div class="sub">Todavía no hay sesiones.</div>'}</div>
+    <span class="sub">· ${esc(s.duracionMin)} min${s.tipo && s.tipo !== 'fuerza' ? '' : ` · ${s.series.length} series · ${fmtKg(L.tonelaje(s.series))}`}${s.rpe ? ` · RPE ${esc(s.rpe)}` : ''}${s.fcProm ? ` · ${esc(s.fcProm)} lpm` : ''}${s.abs ? ' · abs' : ''}${s.clima ? ' · ' + esc(s.clima.txt) : ''}</span></div>`).join('') || '<div class="sub">Todavía no hay sesiones.</div>'}</div>
   <div class="card"><h2>Respaldo</h2><div class="sub">Los datos viven solo en este teléfono. Descarga un respaldo de vez en cuando.</div>
     <button class="btn sec" data-act="exportar">Descargar respaldo</button>
     <label class="btn sec" style="text-align:center">Restaurar respaldo<input type="file" accept="application/json,.json" data-act="importar" hidden></label></div>`;
@@ -546,9 +563,9 @@ function radar(nv) {
   <div class="sub" style="text-align:center"><b style="color:#e5484d">■</b> Volumen: series en 4 semanas (24 = 100 %) · <b style="color:#4c8dff">■</b> Carga: subida de kg desde el primer registro (+${L.SUBIDA_TOPE * 100} % llena el eje)</div>`;
 }
 
-function grafico(pts) {
+function grafico(pts, nota = 'kg máximo por sesión') {
   if (pts.length < 2) return `<div class="sub" style="margin-top:8px">${pts.length ? `Primer registro: ${pts[0].kg} kg. Con dos sesiones aparece la curva.` : 'Sin registros.'}</div>`;
-  const W = 340, H = 190, px = 36, py = 22;
+  const W = 340, H = 190, py = 22, px = Math.max(...pts.map(p => p.kg)) >= 10000 ? 48 : 36;
   const t = pts.map(p => +new Date(p.fecha)), t0 = t[0], dt = (t.at(-1) - t0) || 1;
   const ks = pts.map(p => p.kg), lo = Math.min(...ks), hi = Math.max(...ks), span = (hi - lo) || 1;
   const X = v => px + (v - t0) / dt * (W - px - 12), Y = k => H - py - (k - lo) / span * (H - 2 * py);
@@ -561,7 +578,7 @@ function grafico(pts) {
     <path d="${d}" fill="none" stroke="#4c8dff" stroke-width="2.5"/>
     ${pts.map((p, i) => `<circle cx="${X(t[i])}" cy="${Y(p.kg)}" r="4" fill="#4c8dff"/>`).join('')}
     <text x="${px}" y="${H - 4}">${f(t0)}</text><text x="${W - 12}" y="${H - 4}" text-anchor="end">${f(t.at(-1))}</text>
-  </svg><div class="sub">kg máximo por sesión</div>`;
+  </svg><div class="sub">${nota}</div>`;
 }
 
 function render() {
@@ -816,11 +833,7 @@ const acciones = {
   },
   terminar: () => {
     const a = db.actual;
-    const series = Object.entries(a.hechos).map(([k, h]) => {
-      if (k.startsWith('abs:')) return { ex: L.ABS[+k.split(':')[2]].id, g: 'core', kg: +String(a.absKg).replace(',', '.') || 0, reps: 20 };
-      const e = a.ej.find(x => x.id === k.split(':')[0]);
-      return { ex: e.id, g: e.g, kg: e.kg === null ? null : +String(h.kg).replace(',', '.') || 0, reps: +h.reps || 0 };
-    });
+    const series = seriesHechas(a);
     if (!series.length && !confirm('No marcaste ninguna serie. ¿Guardar igual?')) return;
     db.sesiones.push({
       fecha: a.inicio, tipo: 'fuerza', plan: a.plan, item: a.item, factor: a.factor, plantilla: a.plantilla, rpe: +($('#sRpe')?.value) || null, grupos: a.grupos, min: a.min, duracionMin: Math.round((Date.now() - new Date(a.inicio)) / 60000),

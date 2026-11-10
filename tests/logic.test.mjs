@@ -209,3 +209,14 @@ console.log('ok');
   // Modo libre: sigue intercalando grupos sin plantilla
   assert.ok(L.armarRutina(90, ['espalda', 'empuje']).ej.length > 0);
 }
+
+// Kilos levantados: kg × reps; peso corporal no suma; media por sesión y por grupo
+assert.equal(L.tonelaje([{ kg: 50, reps: 10 }, { kg: 50, reps: 8 }, { kg: null, reps: 12 }, { kg: 0, reps: 10 }]), 900);
+const tm = L.tonelajeMedio([
+  { fecha: '2026-11-02T20:00', series: [{ g: 'piernas', kg: 100, reps: 5 }, { g: 'core', kg: 10, reps: 20 }] },
+  { fecha: '2026-11-04T20:00', series: [{ g: 'piernas', kg: 100, reps: 10 }] },
+  { fecha: '2026-11-05T20:00', series: [] },
+]);
+assert.equal(tm.sesiones, 2); assert.equal(tm.media, 850);
+assert.equal(tm.grupos.piernas.media, 750); assert.equal(tm.grupos.core.sesiones, 1);
+console.log('ok tonelaje');

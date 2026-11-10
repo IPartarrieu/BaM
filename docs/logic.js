@@ -197,6 +197,21 @@ export function resumenSemana(sesiones, fecha = new Date()) {
   };
 }
 
+// Kilos levantados (como Heavy): Σ kg × reps. Las series de peso corporal (kg null/0) no suman.
+export const tonelaje = series => series.reduce((a, x) => a + (+x.kg > 0 ? +x.kg * (+x.reps || 0) : 0), 0);
+
+// Media de kg por sesión, total y por grupo (en las sesiones donde se trabajó ese grupo). desde = ms; 0 = todo el historial.
+export function tonelajeMedio(sesiones, desde = 0) {
+  const ss = sesiones.filter(s => +new Date(s.fecha) >= desde && tonelaje(s.series) > 0);
+  const grupos = {};
+  for (const s of ss) for (const g of new Set(s.series.map(x => x.g))) {
+    const t = tonelaje(s.series.filter(x => x.g === g));
+    if (t > 0) (grupos[g] ??= []).push(t);
+  }
+  const media = v => v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+  return { sesiones: ss.length, media: media(ss.map(s => tonelaje(s.series))), grupos: Object.fromEntries(Object.entries(grupos).map(([g, v]) => [g, { media: media(v), sesiones: v.length }])) };
+}
+
 // Nivel por grupo, dos ejes 0–1:
 //  vol   = series hechas en los últimos 28 días contra 24 (≈ 1 sesión completa del grupo por semana)
 //  carga = subida promedio del kg máximo de cada ejercicio respecto a su primer registro; +25 % llena el eje
