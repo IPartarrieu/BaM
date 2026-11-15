@@ -15,6 +15,7 @@ let form = { min: null, grupos: [], factor: 1, plan: null, item: null, sust: {},
 const rpeMax = r => L.tope(r ?? '7-8'); // RPE más alto aceptado para subir la carga: tope del rango objetivo de la fase
 let clima = null;
 let exSel = null;
+const sesAbiertas = new Set(); // fechas de las sesiones del historial con el detalle de kilos abierto
 let audio = null, wake = null;
 let calMsg = '';
 let cambiandoEj = null; // ejercicio de la sesión en curso cuyo cambio está abierto
@@ -541,12 +542,29 @@ function vistaAvance() {
     ? `<select data-act="exsel">${conKg.map(id => `<option value="${esc(id)}" ${id === exSel ? 'selected' : ''}>${esc(nombreEj(id))}</option>`).join('')}</select>${grafico(L.serieKg(db.sesiones, exSel))}`
     : '<div class="sub">Aparecerá cuando registres series con peso.</div>'}</div>
   <div class="card"><h2>Logros de la semana</h2>${L.logros(db.sesiones).map(l => `<div class="logro ${l.ok ? 'ok' : ''}"><b>${l.i}</b><span>${l.t}</span></div>`).join('')}</div>
-  <div class="card"><h2>Historial</h2>${db.sesiones.slice(-10).reverse().map(s => `<div style="padding:6px 0;border-bottom:1px solid var(--panel2)">
-    <b>${new Date(s.fecha).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' })}</b> · ${s.tipo && s.tipo !== 'fuerza' ? ICONO[s.tipo] ?? '' : (s.grupos || []).map(g => L.GRUPOS[g]?.icono ?? '').join(' ')}
-    <span class="sub">· ${esc(s.duracionMin)} min${s.tipo && s.tipo !== 'fuerza' ? '' : ` · ${s.series.length} series · ${fmtKg(L.tonelaje(s.series))}`}${s.rpe ? ` · RPE ${esc(s.rpe)}` : ''}${s.fcProm ? ` · ${esc(s.fcProm)} lpm` : ''}${s.abs ? ' · abs' : ''}${s.clima ? ' · ' + esc(s.clima.txt) : ''}</span></div>`).join('') || '<div class="sub">Todavía no hay sesiones.</div>'}</div>
+  <div class="card"><h2>Historial</h2>${db.sesiones.length ? '<div class="sub">Toca una sesión de fuerza para ver los kilos de cada ejercicio.</div>' : ''}${db.sesiones.slice(-10).reverse().map(s => {
+    const fuerza = !s.tipo || s.tipo === 'fuerza', abre = fuerza && s.series.length, ab = abre && sesAbiertas.has(s.fecha);
+    return `<div style="padding:6px 0;border-bottom:1px solid var(--panel2)">
+    <div ${abre ? `data-act="verSes" data-v="${esc(s.fecha)}" role="button" tabindex="0" aria-expanded="${!!ab}" style="cursor:pointer"` : ''}>${abre ? `<span style="color:var(--az)">${ab ? '▾' : '▸'}</span> ` : ''}<b>${new Date(s.fecha).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' })}</b> · ${fuerza ? (s.grupos || []).map(g => L.GRUPOS[g]?.icono ?? '').join(' ') : ICONO[s.tipo] ?? ''}
+    <span class="sub">· ${esc(s.duracionMin)} min${fuerza ? ` · ${s.series.length} series · ${fmtKg(L.tonelaje(s.series))}` : ''}${s.rpe ? ` · RPE ${esc(s.rpe)}` : ''}${s.fcProm ? ` · ${esc(s.fcProm)} lpm` : ''}${s.abs ? ' · abs' : ''}${s.clima ? ' · ' + esc(s.clima.txt) : ''}</span></div>
+    ${ab ? detalleSesion(s) : ''}</div>`; }).join('') || '<div class="sub">Todavía no hay sesiones.</div>'}</div>
   <div class="card"><h2>Respaldo</h2><div class="sub">Los datos viven solo en este teléfono. Descarga un respaldo de vez en cuando.</div>
     <button class="btn sec" data-act="exportar">Descargar respaldo</button>
     <label class="btn sec" style="text-align:center">Restaurar respaldo<input type="file" accept="application/json,.json" data-act="importar" hidden></label></div>`;
+}
+
+// Kilos de cada ejercicio de una sesión: series kg × reps, total (kg × reps) y cambio respecto a la última vez que se hizo.
+const kgNum = v => String(Math.round(+v * 10) / 10).replace('.', ',');
+function detalleSesion(s) {
+  const i = db.sesiones.indexOf(s), det = L.detalleKg(s.series, db.sesiones.slice(0, i)), tope = Math.max(1, ...det.map(e => e.kg));
+  return `<div style="margin:8px 0 4px 14px">${det.map(e => {
+    const dif = e.antes === null || !e.kg ? null : Math.round(e.kg - e.antes);
+    return `<div style="margin:8px 0"><div class="fila" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><span>${esc(nombreEj(e.ex))}</span>
+      <b style="white-space:nowrap">${e.kg ? fmtKg(e.kg) : `${e.reps} reps`}</b></div>
+      ${e.kg ? `<div class="barra" style="margin:3px 0"><i style="width:${e.kg / tope * 100}%;background:${COLOR[e.g] ?? '#4c8dff'}"></i></div>` : ''}
+      <div class="sub">${e.series.map(x => x.kg === null || x.kg === undefined ? `corporal × ${x.reps}` : `${kgNum(x.kg)} kg × ${x.reps}`).join(' · ')}
+      ${e.kg ? ` · máx ${kgNum(e.max)} kg` : ''}${dif === null ? (e.kg && e.antes === null ? ' · primera vez' : '') : ` · <span style="color:${dif > 0 ? 'var(--ok)' : dif < 0 ? '#e5484d' : 'inherit'}">${dif > 0 ? '▲ +' : dif < 0 ? '▼ −' : '= '}${dif ? fmtKg(Math.abs(dif)) : 'igual'} vs. la vez anterior</span>`}</div></div>`;
+  }).join('')}</div>`;
 }
 
 function radar(nv) {
@@ -677,6 +695,7 @@ const acciones = {
   tab: el => { tab = el.dataset.tab; render(); scrollTo(0, 0); },
   min: el => { form.min = +el.dataset.v; if (!form.plantilla) { form.factor = 1; form.plan = null; form.item = null; } form.sust = {}; form.cambiando = null; render(); },
   grupo: el => { const g = el.dataset.v; form.grupos = form.grupos.includes(g) ? form.grupos.filter(x => x !== g) : [...form.grupos, g]; form.factor = 1; form.plan = null; form.item = null; form.plantilla = null; form.rpe = null; form.sust = {}; form.cambiando = null; render(); },
+  verSes: el => { const f = el.dataset.v; sesAbiertas.has(f) ? sesAbiertas.delete(f) : sesAbiertas.add(f); render(); },
   musculo: el => { musculo = musculo === el.dataset.v ? null : el.dataset.v; render(); },
   basico: el => { const d = diaHoy(); db.basicos[d] = { ...db.basicos[d], [el.dataset.v]: el.checked }; guardar(); render(); },
   entrenarGrupo: el => { form.grupos = [el.dataset.v]; form.plantilla = null; form.rpe = null; form.factor = 1; form.sust = {}; form.cambiando = null; tab = 'hoy'; render(); scrollTo(0, 0); },
@@ -839,6 +858,7 @@ const acciones = {
       fecha: a.inicio, tipo: 'fuerza', plan: a.plan, item: a.item, factor: a.factor, plantilla: a.plantilla, rpe: +($('#sRpe')?.value) || null, grupos: a.grupos, min: a.min, duracionMin: Math.round((Date.now() - new Date(a.inicio)) / 60000),
       abs: Object.keys(a.hechos).some(k => k.startsWith('abs:')), clima: a.clima, series,
     });
+    if (series.length) sesAbiertas.add(a.inicio); // al terminar, el historial muestra abiertos los kilos de cada ejercicio
     db.basicos[diaHoy()] = { ...db.basicos[diaHoy()], mov: true };
     db.actual = null; form = { min: null, grupos: [], factor: 1, plan: null, item: null, sust: {}, cambiando: null }; tab = 'avance';
     wake?.release(); guardar(); render(); scrollTo(0, 0);
