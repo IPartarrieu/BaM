@@ -219,4 +219,11 @@ const tm = L.tonelajeMedio([
 ]);
 assert.equal(tm.sesiones, 2); assert.equal(tm.media, 850);
 assert.equal(tm.grupos.piernas.media, 750); assert.equal(tm.grupos.core.sesiones, 1);
+// Detalle por ejercicio: agrupa en orden, suma kg × reps y compara con la última vez
+const dk = L.detalleKg(
+  [{ ex: 'pm_hex', g: 'piernas', kg: 60, reps: 5 }, { ex: 'jalon', g: 'espalda', kg: 45, reps: 8 }, { ex: 'pm_hex', g: 'piernas', kg: 62.5, reps: 4 }, { ex: 'nordico', g: 'piernas', kg: null, reps: 5 }],
+  [{ series: [{ ex: 'pm_hex', kg: 60, reps: 4 }] }, { series: [{ ex: 'pm_hex', kg: 60, reps: 5 }] }]);
+assert.deepEqual(dk.map(e => e.ex), ['pm_hex', 'jalon', 'nordico']);
+assert.deepEqual([dk[0].kg, dk[0].max, dk[0].reps, dk[0].antes], [550, 62.5, 9, 300]);
+assert.deepEqual([dk[1].antes, dk[2].kg, dk[2].max], [null, 0, 0]);
 console.log('ok tonelaje');

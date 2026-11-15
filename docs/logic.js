@@ -200,6 +200,18 @@ export function resumenSemana(sesiones, fecha = new Date()) {
 // Kilos levantados (como Heavy): Σ kg × reps. Las series de peso corporal (kg null/0) no suman.
 export const tonelaje = series => series.reduce((a, x) => a + (+x.kg > 0 ? +x.kg * (+x.reps || 0) : 0), 0);
 
+// Detalle de una sesión por ejercicio (en el orden en que se hicieron): series kg × reps, kilos levantados y carga máxima.
+// previas: sesiones anteriores; `antes` = kilos de ese ejercicio la última vez que se hizo (null si es la primera).
+export function detalleKg(series, previas = []) {
+  const por = new Map();
+  for (const x of series) (por.get(x.ex) ?? por.set(x.ex, { ex: x.ex, g: x.g, series: [] }).get(x.ex)).series.push({ kg: x.kg, reps: +x.reps || 0 });
+  return [...por.values()].map(e => {
+    const ult = [...previas].reverse().find(s => s.series.some(y => y.ex === e.ex));
+    return { ...e, kg: tonelaje(e.series), max: Math.max(0, ...e.series.map(y => +y.kg || 0)), reps: e.series.reduce((a, y) => a + y.reps, 0),
+      antes: ult ? tonelaje(ult.series.filter(y => y.ex === e.ex)) : null };
+  });
+}
+
 // Media de kg por sesión, total y por grupo (en las sesiones donde se trabajó ese grupo). desde = ms; 0 = todo el historial.
 export function tonelajeMedio(sesiones, desde = 0) {
   const ss = sesiones.filter(s => +new Date(s.fecha) >= desde && tonelaje(s.series) > 0);
