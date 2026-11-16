@@ -537,7 +537,7 @@ function vistaAvance() {
   return `<h1>Avance semanal</h1>
   <div class="card"><div class="fila" style="justify-content:space-around;text-align:center">${stat(`${r.sesiones}/${L.META}`, 'sesiones')}${stat(r.minutos, 'minutos')}${stat(r.series, 'series')}</div></div>
   <div class="card"><h2>Nivel por grupo <span class="sub">· últimas 4 semanas</span></h2>${radar(nv)}</div>
-  <div class="card"><h2>Kilos levantados <span class="sub">· como Heavy: kg × reps</span></h2>${vistaTonelaje()}</div>
+  <div class="card"><h2>Kilos levantados</h2>${vistaTonelaje()}</div>
   <div class="card"><h2>Evolución de la carga</h2>${conKg.length
     ? `<select data-act="exsel">${conKg.map(id => `<option value="${esc(id)}" ${id === exSel ? 'selected' : ''}>${esc(nombreEj(id))}</option>`).join('')}</select>${grafico(L.serieKg(db.sesiones, exSel))}`
     : '<div class="sub">Aparecerá cuando registres series con peso.</div>'}</div>

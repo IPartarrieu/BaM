@@ -197,7 +197,7 @@ export function resumenSemana(sesiones, fecha = new Date()) {
   };
 }
 
-// Kilos levantados (como Heavy): Σ kg × reps. Las series de peso corporal (kg null/0) no suman.
+// Kilos levantados: Σ kg × reps. Las series de peso corporal (kg null/0) no suman.
 export const tonelaje = series => series.reduce((a, x) => a + (+x.kg > 0 ? +x.kg * (+x.reps || 0) : 0), 0);
 
 // Detalle de una sesión por ejercicio (en el orden en que se hicieron): series kg × reps, kilos levantados y carga máxima.
