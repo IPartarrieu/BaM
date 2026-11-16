@@ -88,6 +88,13 @@ function tarjetaMeta() {
     <div class="barra"><i style="width:${(est.semana + 1) / est.total * 100}%"></i></div><div class="sub">${L.FASES[est.fase].obj}</div></div>`;
 }
 
+// Ejercicios de una sesión de fuerza del plan, para verlos antes de empezar (con los cambios ya hechos si la rutina está abierta abajo).
+function ejerciciosPlan(ses, f) {
+  if (ses?.tipo !== 'fuerza') return '';
+  const r = L.armarRutina(ses.min, ses.grupos, ses.factor, form.plan === f ? form.sust : {}, ses.plantilla);
+  return `<ul class="lista">${r.ej.map(e => `<li>${esc(e.n)} · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''}</li>`).join('')}${r.conAbs ? '<li>🔥 Core: abdominales con disco</li>' : ''}</ul>`;
+}
+
 function tarjetaHoy(hoy) {
   const d = db.meta && diaPlan(hoy);
   if (!d) return '';
@@ -95,8 +102,8 @@ function tarjetaHoy(hoy) {
   const ses = d.ses, dep = d.deporte ? `<div class="sub">⚽ ${esc(d.deporte)}: cuenta como entrenamiento intenso</div>` : '';
   if (d.hecho) return `<div class="card"><h2>Hoy</h2><div>✓ Ya entrenaste hoy</div>${dep}</div>`;
   const cambiar = `<button class="btn sec" data-act="editar" data-v="${hoy}">Cambiar</button>`;
-  if (ses) return `<div class="card"><h2>Hoy</h2><div>${ses.i} ${ses.n} · ${d.hora} · ${d.min} min</div><div class="sub">${d.item.fija ? '⭐ fija' : 'variable'}</div>${dep}
-    <button class="btn" data-act="planEmpezar">Empezar</button>${cambiar}</div>`;
+  if (ses) return `<div class="card"><h2>Hoy</h2><div>${ses.i} ${ses.n} · ${d.hora} · ${d.min} min</div><div class="sub">${d.item.fija ? '⭐ fija' : 'variable'}</div>${ejerciciosPlan(ses, hoy)}${dep}
+    <button class="btn" data-act="planEmpezar">${ses.tipo === 'fuerza' ? 'Ver rutina, cambiar ejercicios y empezar' : 'Empezar'}</button>${cambiar}</div>`;
   return `<div class="card"><h2>Hoy</h2>${dep}<div class="sub">Día libre: camina o haz movilidad 20 min</div>${cambiar}</div>`;
 }
 
@@ -104,7 +111,7 @@ function tarjetaManana() {
   const m = L.sumarDias(diaHoy(), 1), d = db.meta && diaPlan(m);
   if (!d) return '';
   if (db.dias[m] && editando !== m) return `<div class="card"><h2>Mañana · ${fechaTxt(m, { weekday: 'long' })}</h2>
-    <div>Confirmado: ${d.ses ? `${d.ses.i} ${d.ses.n} a las ${d.hora} · ${d.min} min` : 'día libre'}</div>
+    <div>Confirmado: ${d.ses ? `${d.ses.i} ${d.ses.n} a las ${d.hora} · ${d.min} min` : 'día libre'}</div>${ejerciciosPlan(d.ses, m)}
     <button class="btn sec" data-act="editar" data-v="${m}">Cambiar</button></div>`;
   return editorDia(m);
 }
@@ -286,7 +293,7 @@ function cardAcerca() {
 // Lista de reemplazos para un ejercicio que no se puede hacer hoy (act: acción que aplica la elección).
 function panelCambio(e, enRutina, act) {
   const alt = L.alternativas(e, enRutina);
-  return `<div class="card"><div class="sub" style="margin-bottom:4px">No puedes hacer ${esc(e.orig ? nombreEj(e.orig) : e.n)}: elige otro del mismo grupo.</div>
+  return `<div class="card"><div class="sub" style="margin-bottom:4px">No puedes hacer ${esc(e.orig ? nombreEj(e.orig) : e.n)}: elige otro que entrene lo mismo (${alt.length} opciones).</div>
     ${alt.map(x => `<button class="alt" data-act="${act}" data-v="${e.id}" data-n="${x.id}"><span><b>${x.id === (e.orig ?? e.id) ? 'Volver a ' : ''}${x.n}</b><small class="sub">${x.s} × ${x.r}${x.x ? ' ' + x.x : ''} · descanso ${x.d} s · ${[...new Set(x.m.map(m => L.MUSCULOS[m][0]))].slice(0, 3).join(', ')}</small></span></button>`).join('') || '<div class="sub">No hay otro ejercicio libre en este grupo.</div>'}
     <button class="mini" style="background:var(--panel);margin-top:6px" data-act="cambiar" data-v="${e.id}">Cerrar</button></div>`;
 }

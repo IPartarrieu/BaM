@@ -21,6 +21,13 @@ export const GRUPOS = {
     { id: 'curl_fem', alt: true, n: 'Curl femoral tumbado en máquina o con banda', s: 3, r: '8', d: 120, p: 4, pat: 'flexion_rodilla', kg: 25, m: ['isquios', 'gemelos'] },
     { id: 'aduccion', alt: true, n: 'Aducción en máquina o polea', s: 3, r: '12', x: 'por lado', d: 60, p: 4, pat: 'aductor', kg: 15, m: ['aductores'] },
     { id: 'copenhague', n: 'Plancha Copenhague', s: 3, r: '20 s', x: 'por lado', d: 60, p: 4, pat: 'aductor', kg: null, w: 50, m: ['aductores', 'oblicuos'] },
+    { id: 'gemelos_pie', n: 'Elevación de gemelos de pie (escalón o máquina)', s: 3, r: '12-15', d: 60, p: 5, pat: 'gemelo', kg: 40, m: ['gemelos'] },
+    { id: 'prensa', alt: true, n: 'Prensa de piernas', s: 3, r: '8-10', d: 120, p: 2, pat: 'sentadilla', kg: 100, m: ['cuadriceps', 'gluteos', 'aductores'] },
+    { id: 'bulgara', alt: true, n: 'Sentadilla búlgara con mancuernas', s: 3, r: '8', x: 'por lado', d: 120, p: 2, pat: 'sentadilla', kg: 12, w: 50, m: ['cuadriceps', 'gluteos', 'aductores'] },
+    { id: 'zancada', alt: true, n: 'Zancadas con mancuernas', s: 3, r: '10', x: 'por lado', d: 120, p: 2, pat: 'sentadilla', kg: 12, w: 50, m: ['cuadriceps', 'gluteos', 'aductores'] },
+    { id: 'step_up', alt: true, n: 'Subida al cajón con mancuernas', s: 3, r: '8', x: 'por lado', d: 120, p: 2, pat: 'sentadilla', kg: 12, w: 45, m: ['cuadriceps', 'gluteos'] },
+    { id: 'puente_uni', alt: true, n: 'Puente de glúteo a una pierna (peso corporal)', s: 3, r: '10', x: 'por lado', d: 120, p: 2, pat: 'bisagra', kg: null, w: 45, m: ['gluteos', 'isquios'] },
+    { id: 'gemelos_uni', alt: true, n: 'Elevación de gemelos a una pierna (peso corporal o mancuerna)', s: 3, r: '12', x: 'por lado', d: 60, p: 5, pat: 'gemelo', kg: null, w: 40, m: ['gemelos'] },
   ]},
   espalda: { nombre: 'Espalda y tracción', icono: '🪢', ej: [
     { id: 'jalon', n: 'Jalón al pecho', s: 4, r: '6-8', d: 120, p: 3, pat: 'traccion_v', kg: 45, m: ['dorsales', 'biceps', 'deltoides_post'] },
@@ -28,6 +35,11 @@ export const GRUPOS = {
     { id: 'face_pull', n: 'Face pull', s: 3, r: '12-15', d: 75, p: 5, pat: 'traccion_h', kg: 15, m: ['deltoides_post', 'trapecio'] },
     { id: 'dominadas', alt: true, n: 'Dominadas (asistidas si hace falta)', s: 3, r: '6', d: 120, p: 3, pat: 'traccion_v', kg: null, m: ['dorsales', 'biceps', 'antebrazos'] },
     { id: 'remo_uni', n: 'Remo unilateral mancuerna', s: 3, r: '8-10', x: 'por lado', d: 60, p: 3, pat: 'traccion_h', kg: 18, w: 60, m: ['dorsales', 'biceps', 'antebrazos'] },
+    { id: 'remo_polea', alt: true, n: 'Remo sentado en polea', s: 3, r: '8-10', d: 120, p: 3, pat: 'traccion_h', kg: 40, m: ['dorsales', 'trapecio', 'deltoides_post', 'biceps'] },
+    { id: 'remo_inv', alt: true, n: 'Remo invertido (barra baja, anillas o TRX)', s: 3, r: '8-10', d: 120, p: 3, pat: 'traccion_h', kg: null, m: ['dorsales', 'trapecio', 'deltoides_post', 'biceps'] },
+    { id: 'remo_manc2', alt: true, n: 'Remo con dos mancuernas inclinado', s: 3, r: '8-10', d: 120, p: 3, pat: 'traccion_h', kg: 16, m: ['dorsales', 'trapecio', 'deltoides_post', 'biceps', 'lumbares'] },
+    { id: 'jalon_banda', alt: true, n: 'Jalón con banda elástica', s: 3, r: '10-12', d: 120, p: 3, pat: 'traccion_v', kg: null, m: ['dorsales', 'biceps', 'deltoides_post'] },
+    { id: 'hiperext', alt: true, n: 'Hiperextensión en banco o superman en el suelo', s: 3, r: '10-12', d: 75, p: 5, pat: 'extension_tronco', kg: null, m: ['lumbares', 'gluteos', 'isquios'] },
   ]},
   empuje: { nombre: 'Pecho y hombros', icono: '🛡️', ej: [
     { id: 'press_incl', n: 'Press banca inclinado', s: 4, r: '6-8', d: 150, p: 3, pat: 'empuje_h', kg: 40, m: ['pectorales', 'deltoides', 'triceps'] },
@@ -36,10 +48,22 @@ export const GRUPOS = {
     { id: 'militar_manc', alt: true, n: 'Press militar con mancuernas sentado', s: 3, r: '8', d: 120, p: 3, pat: 'empuje_v', kg: 12, m: ['deltoides', 'triceps'] },
     { id: 'fondos', n: 'Fondos', s: 3, r: '8-12', d: 120, p: 3, pat: 'empuje_h', kg: 0, m: ['pectorales', 'triceps', 'deltoides'] },
     { id: 'landmine', n: 'Landmine press con rotación', s: 4, r: '5-8', x: 'por lado', d: 90, p: 3, pat: 'empuje_v', kg: 20, w: 50, m: ['deltoides', 'pectorales', 'oblicuos', 'triceps'] },
+    { id: 'flexiones', alt: true, n: 'Flexiones (con pies elevados si son fáciles)', s: 3, r: '10-15', d: 120, p: 3, pat: 'empuje_h', kg: null, m: ['pectorales', 'triceps', 'deltoides'] },
+    { id: 'press_plano', alt: true, n: 'Press plano con mancuernas', s: 3, r: '8', d: 120, p: 3, pat: 'empuje_h', kg: 20, m: ['pectorales', 'triceps', 'deltoides'] },
+    { id: 'press_maq', alt: true, n: 'Press de pecho en máquina', s: 3, r: '8-10', d: 120, p: 3, pat: 'empuje_h', kg: 40, m: ['pectorales', 'triceps', 'deltoides'] },
+    { id: 'militar_kb', alt: true, n: 'Press militar de pie con kettlebell', s: 3, r: '8', x: 'por lado', d: 120, p: 3, pat: 'empuje_v', kg: 12, w: 45, m: ['deltoides', 'triceps', 'abdominales'] },
+    { id: 'pike', alt: true, n: 'Flexiones pike (cadera arriba)', s: 3, r: '8-10', d: 120, p: 3, pat: 'empuje_v', kg: null, m: ['deltoides', 'triceps', 'pectorales'] },
   ]},
   brazos: { nombre: 'Brazos y agarre', icono: '✊', ej: [
     { id: 'curl_mart', n: 'Curl martillo', s: 3, r: '10-12', d: 75, p: 5, pat: 'flexion_codo', kg: 10, m: ['biceps', 'antebrazos'] },
     { id: 'curl_rev', n: 'Curl reverso', s: 3, r: '10-12', d: 75, p: 5, pat: 'flexion_codo', kg: 15, m: ['antebrazos', 'biceps'] },
+    { id: 'tri_polea', n: 'Extensión de tríceps en polea (cuerda)', s: 3, r: '10-12', d: 75, p: 5, pat: 'extension_codo', kg: 20, m: ['triceps'] },
+    { id: 'tri_manc', n: 'Extensión de tríceps sobre la cabeza con mancuerna', s: 3, r: '10-12', d: 75, p: 5, pat: 'extension_codo', kg: 12, m: ['triceps', 'deltoides'] },
+    { id: 'fondo_banco', alt: true, n: 'Fondos en banco (peso corporal)', s: 3, r: '10-15', d: 75, p: 5, pat: 'extension_codo', kg: null, m: ['triceps', 'deltoides', 'pectorales'] },
+    { id: 'flex_diam', alt: true, n: 'Flexiones diamante', s: 3, r: '8-12', d: 75, p: 5, pat: 'extension_codo', kg: null, m: ['triceps', 'pectorales', 'deltoides'] },
+    { id: 'tri_banda', alt: true, n: 'Extensión de tríceps con banda elástica', s: 3, r: '12-15', d: 60, p: 5, pat: 'extension_codo', kg: null, m: ['triceps'] },
+    { id: 'curl_manc', alt: true, n: 'Curl alterno con mancuernas', s: 3, r: '10', d: 75, p: 5, pat: 'flexion_codo', kg: 10, m: ['biceps', 'antebrazos'] },
+    { id: 'curl_banda', alt: true, n: 'Curl con banda elástica', s: 3, r: '12-15', d: 60, p: 5, pat: 'flexion_codo', kg: null, m: ['biceps', 'antebrazos'] },
     { id: 'pinch', n: 'Pinch grip con discos', s: 3, r: '30 s', d: 60, p: 6, pat: 'agarre', kg: 10, m: ['antebrazos'] },
     { id: 'colgarse', n: 'Colgarse del gi o toalla', s: 3, r: 'máx', d: 90, p: 6, pat: 'agarre', kg: null, w: 45, m: ['antebrazos', 'dorsales'] },
     { id: 'farmer', n: 'Farmer carry 30 m', s: 4, r: '1', d: 90, p: 6, pat: 'agarre', kg: 24, m: ['antebrazos', 'trapecio', 'abdominales'] },
@@ -50,6 +74,8 @@ export const GRUPOS = {
     { id: 'salto_vert', alt: true, n: 'Salto vertical en el lugar', s: 4, r: '4', d: 150, p: 1, pat: 'salto', kg: null, w: 20, m: ['cuadriceps', 'gluteos', 'gemelos'] },
     { id: 'cajon', n: 'Salto al cajón', s: 4, r: '4', d: 150, p: 1, pat: 'salto', kg: null, w: 20, m: ['cuadriceps', 'gluteos', 'gemelos'] },
     { id: 'balon_rot', n: 'Lanzamiento rotacional balón medicinal', s: 3, r: '6', x: 'por lado', d: 90, p: 1, pat: 'rotacion', kg: 4, m: ['oblicuos', 'abdominales', 'deltoides'] },
+    { id: 'burpee', alt: true, n: 'Burpee', s: 4, r: '5', d: 120, p: 1, pat: 'salto', kg: null, w: 25, m: ['cuadriceps', 'pectorales', 'deltoides'] },
+    { id: 'balon_slam', alt: true, n: 'Lanzamiento del balón medicinal contra el suelo', s: 3, r: '6', d: 90, p: 1, pat: 'rotacion', kg: 4, m: ['abdominales', 'dorsales', 'deltoides'] },
     { id: 'remo_maq', n: 'Remo en máquina 250 m', s: 4, r: '1', d: 90, p: 5, pat: 'traccion_h', kg: null, w: 60, m: ['dorsales', 'cuadriceps', 'gluteos', 'biceps'] },
   ]},
 };
@@ -79,8 +105,8 @@ export const ejerciciosDe = musculo => Object.entries(GRUPOS)
 // Cuerpo completo A/B: así cada grupo muscular se entrena 2 veces por semana (con ejercicios distintos).
 // [id, series]; sin series, las del ejercicio. Los explosivos (p 1) solo desde la fase Construcción.
 export const PLANTILLAS = {
-  A: [['swing', 3], ['pm_hex', 3], ['press_incl', 3], ['jalon', 3], ['nordico', 2], ['curl_mart', 2], ['colgarse', 2]],
-  B: [['cajon', 3], ['hack', 3], ['militar', 3], ['remo_barra', 3], ['copenhague', 2], ['face_pull', 2], ['farmer', 2]],
+  A: [['swing', 3], ['pm_hex', 3], ['press_incl', 3], ['jalon', 3], ['nordico', 2], ['tri_polea', 2], ['curl_mart', 2], ['colgarse', 2]],
+  B: [['cajon', 3], ['hack', 3], ['militar', 3], ['remo_barra', 3], ['copenhague', 2], ['tri_manc', 2], ['face_pull', 2], ['gemelos_pie', 2], ['farmer', 2]],
 };
 
 const costo = (e, s) => s * ((e.w ?? 40) + e.d) + CAMBIO_SEG;
@@ -98,10 +124,10 @@ export function armarRutina(minutos, grupos, factor = 1, cambios = {}, plantilla
   const orden = [];
   if (plantilla) {
     PLANTILLAS[plantilla.k].forEach(([id, s]) => { const e = ejDe(id); if (plantilla.potencia || e.p !== 1) orden.push(escala({ ...e, s: s ?? e.s })); });
-    // Descarga (factor < 0,7): tope de series totales = factor × las de la sesión completa, quitando desde el final (accesorios y agarre
-    // pueden salir; el resto queda en 2 series como mínimo). Si no, el tiempo sobrante se llenaría y el volumen no bajaría.
+    // Descarga (factor < 0,7): tope de series totales = factor × las de una sesión normal del mismo tiempo, quitando desde el final
+    // (accesorios y agarre pueden salir; el resto queda en 2 series como mínimo). Si no, el tiempo sobrante se llenaría y el volumen no bajaría.
     if (factor < .7) {
-      const tope = Math.round(PLANTILLAS[plantilla.k].filter(([id]) => plantilla.potencia || ejDe(id).p !== 1).reduce((n, [id, s]) => n + (s ?? ejDe(id).s), 0) * factor);
+      const tope = Math.round(armarRutina(minutos, grupos, 1, {}, plantilla).ej.reduce((n, e) => n + e.s, 0) * factor);
       let total = orden.reduce((n, e) => n + e.s, 0);
       for (const e of [...orden].reverse()) { while (total > tope && e.s > (e.p >= 5 ? 0 : 2)) { e.s--; total--; } }
       orden.splice(0, orden.length, ...orden.filter(e => e.s > 0));
@@ -112,12 +138,24 @@ export function armarRutina(minutos, grupos, factor = 1, cambios = {}, plantilla
     for (let i = 0; listas.some(l => i < l.length); i++) listas.forEach(l => l[i] && orden.push(l[i]));
   }
   orden.sort((a, b) => a.p - b.p); // por prioridad (el sort es estable: dentro de cada una queda el intercalado de grupos)
-  // Si falta tiempo se recorta desde el final; la prevención (nórdico, Copenhague) reserva 2 series (hasta el 40 % del tiempo) antes de repartir el resto.
   const mete = (e, disp) => { for (let s = e.s; s >= 2; s--) if (costo(e, s) <= disp) return s; return 0; };
-  const prev = orden.filter(e => e.p === 4), minPrev = es => es.reduce((n, e) => n + costo(e, 2), 0);
-  const hechas = new Map(), reserva = Math.min(minPrev(prev), libre * .4);
-  for (const e of orden.filter(e => e.p !== 4)) { const s = mete(e, libre - reserva); if (s) { hechas.set(e.id, s); libre -= costo(e, s); } }
-  prev.forEach((e, i) => { const s = mete(e, libre - minPrev(prev.slice(i + 1))); if (s) { hechas.set(e.id, s); libre -= costo(e, s); } });
+  const hechas = new Map();
+  if (plantilla) {
+    // Cuerpo completo: primero 2 series de cada ejercicio (básicos, prevención, explosivo, accesorios, agarre) mientras quepa, para que
+    // ningún patrón quede fuera; lo que sobra sube las series, básicos primero, hasta las de la plantilla.
+    const imp = e => [2, 3, 4, 1, 5, 6].indexOf(e.p);
+    const porImp = [...orden].sort((a, b) => imp(a) - imp(b));
+    for (const e of porImp) if (e.s >= 2 && costo(e, 2) <= libre) { hechas.set(e.id, 2); libre -= costo(e, 2); }
+    for (const e of porImp) while (hechas.has(e.id) && hechas.get(e.id) < e.s && costo(e, hechas.get(e.id) + 1) - costo(e, hechas.get(e.id)) <= libre) {
+      libre -= costo(e, hechas.get(e.id) + 1) - costo(e, hechas.get(e.id)); hechas.set(e.id, hechas.get(e.id) + 1);
+    }
+  } else {
+    // Si falta tiempo se recorta desde el final; la prevención (nórdico, Copenhague) reserva 2 series (hasta el 40 % del tiempo) antes de repartir el resto.
+    const prev = orden.filter(e => e.p === 4), minPrev = es => es.reduce((n, e) => n + costo(e, 2), 0);
+    const reserva = Math.min(minPrev(prev), libre * .4);
+    for (const e of orden.filter(e => e.p !== 4)) { const s = mete(e, libre - reserva); if (s) { hechas.set(e.id, s); libre -= costo(e, s); } }
+    prev.forEach((e, i) => { const s = mete(e, libre - minPrev(prev.slice(i + 1))); if (s) { hechas.set(e.id, s); libre -= costo(e, s); } });
+  }
   const ej = orden.filter(e => hechas.has(e.id)).map(e => sustituir(e, cambios[e.id], hechas.get(e.id)));
   return { ej, conAbs, sobraMin: Math.max(0, Math.floor(libre / 60)) };
 }
@@ -131,14 +169,15 @@ export function sustituir(e, idNuevo, s = e.s) {
   return { ...n, s, orig: n.id === (e.orig ?? e.id) ? undefined : (e.orig ?? e.id) };
 }
 
-// Opciones para reemplazar `e` sin cambiar lo que entrena: del mismo grupo o de otro con ≥ 2 músculos en común, que no
-// estén ya en la rutina; primero el mismo patrón de movimiento, luego la misma prioridad, luego más músculos en común.
-// Un explosivo solo se cambia por otro explosivo (y un básico nunca por uno). Si ya está cambiado, incluye el original.
+// Opciones para reemplazar `e` sin cambiar lo que entrena: que no estén ya en la rutina y sean del mismo grupo, del mismo patrón de
+// movimiento o con el mismo músculo principal (≥ 1 de los 2 primeros). Primero el mismo patrón, luego la misma prioridad, luego más
+// músculos en común. Un explosivo solo se cambia por otro explosivo (y un básico nunca por uno). Si ya está cambiado, incluye el original.
 export function alternativas(e, enRutina) {
   const usados = new Set(enRutina.map(x => x.id)), base = ejDe(e.orig ?? e.id) ?? e;
   const comp = x => x.m.filter(m => base.m.includes(m)).length;
+  const principal = x => x.m.slice(0, 2).some(m => base.m.slice(0, 2).includes(m));
   return Object.entries(GRUPOS).flatMap(([g, G]) => G.fija ? [] : G.ej.map(x => ({ ...x, g })))
-    .filter(x => x.id === base.id ? e.orig : !usados.has(x.id) && (x.p === 1) === (base.p === 1) && (x.g === base.g || comp(x) >= 2))
+    .filter(x => x.id === base.id ? e.orig : !usados.has(x.id) && (x.p === 1) === (base.p === 1) && (x.g === base.g || x.pat === base.pat || principal(x)))
     .sort((a, b) => (b.id === base.id) - (a.id === base.id) || (b.pat === base.pat) - (a.pat === base.pat) || (b.p === base.p) - (a.p === base.p) || comp(b) - comp(a));
 }
 

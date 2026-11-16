@@ -172,7 +172,7 @@ console.log('ok');
   assert.equal(L.alternativas(c.ej[1], c.ej)[0].id, 'hack');
   // un explosivo solo se cambia por otro explosivo
   const pot = L.armarRutina(90, ['potencia']); const caj = pot.ej.find(e => e.id === 'cajon');
-  assert.deepEqual(L.alternativas(caj, pot.ej).map(x => x.id), ['salto_vert']);
+  const ac = L.alternativas(caj, pot.ej); assert.equal(ac[0].id, 'salto_vert'); assert.ok(ac.length >= 3 && ac.every(x => x.p === 1));
   // los sustitutos no entran solos en las rutinas ni en el mapa muscular
   assert.ok(!L.armarRutina(120, ['piernas', 'espalda', 'empuje', 'potencia']).ej.some(e => e.alt));
   assert.ok(!L.ejerciciosDe('aductores').some(e => e.alt));
@@ -227,3 +227,23 @@ assert.deepEqual(dk.map(e => e.ex), ['pm_hex', 'jalon', 'nordico']);
 assert.deepEqual([dk[0].kg, dk[0].max, dk[0].reps, dk[0].antes], [550, 62.5, 9, 300]);
 assert.deepEqual([dk[1].antes, dk[2].kg, dk[2].max], [null, 0, 0]);
 console.log('ok tonelaje');
+
+// Más opciones al cambiar un ejercicio: con barra ocupada quedan variantes con mancuernas, peso corporal o banda
+{
+  const r = L.armarRutina(90, ['espalda', 'empuje', 'piernas']);
+  for (const e of r.ej.filter(e => e.p === 2 || e.p === 3)) assert.ok(L.alternativas(e, r.ej).length >= 4, e.id);
+  assert.ok(L.alternativas({ id: 'remo_barra' }, r.ej).some(x => x.id === 'remo_inv'));
+}
+
+// Cuerpo completo: aunque falte tiempo entran empuje, tracción, pierna y tríceps directo; los dos días juntos cubren el tríceps y los gemelos
+{
+  const arma = (k, min, fase = 'construccion') => { const s = L.sesion('fuerza' + k, fase, min); return L.armarRutina(min, s.grupos, s.factor, {}, s.plantilla); };
+  for (const [k, min] of [['A', 75], ['A', 60], ['B', 60]]) {
+    const r = arma(k, min), pat = new Set(r.ej.map(e => e.pat));
+    assert.ok(['empuje_h', 'empuje_v'].some(x => pat.has(x)) && ['traccion_h', 'traccion_v'].some(x => pat.has(x)) && (pat.has('bisagra') || pat.has('sentadilla')), k + min);
+  }
+  assert.ok(arma('A', 75).ej.some(e => e.m[0] === 'triceps') && arma('B', 60).ej.some(e => e.m[0] === 'triceps'));
+  const dos = [...arma('A', 90).ej, ...arma('B', 90).ej, ...L.ABS].map(e => e.m[0]);
+  for (const m of ['triceps', 'gemelos', 'biceps', 'pectorales', 'dorsales', 'cuadriceps', 'isquios', 'gluteos', 'aductores', 'deltoides_post']) assert.ok(dos.includes(m), m);
+}
+console.log('ok alternativas y cobertura');
