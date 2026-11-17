@@ -102,12 +102,23 @@ export const ejerciciosDe = musculo => Object.entries(GRUPOS)
   .flatMap(([g, G]) => G.ej.filter(e => !e.alt).map(e => ({ ...e, g })))
   .filter(e => e.m.includes(musculo));
 
-// Cuerpo completo A/B: así cada grupo muscular se entrena 2 veces por semana (con ejercicios distintos).
-// [id, series]; sin series, las del ejercicio. Los explosivos (p 1) solo desde la fase Construcción.
+// Pierna (A) y Torso (B), con la estructura de @oriol.jiujitsu: Explosividad → Fuerza → Músculo (puntos débiles) → Core.
+// Pierna: saltos a máxima potencia, sentadilla y peso muerto, femoral/aductor/gemelo. Torso: lanzamientos de balón, empuje y tracción
+// verticales y horizontales, brazos, deltoide posterior y agarre. Core (flexión y rotación de columna) al final de las dos.
+// [id, series, pareja]; sin series, las del ejercicio. La dosis sale de la evidencia: 3-4 series en los básicos (ACSM 2026), nunca 2.
+// pareja: series alternadas con un ejercicio que no fatiga lo mismo (empuje ↔ tracción, femoral ↔ aductor, bíceps ↔ tríceps):
+// se descansa PAR_DESC entre uno y otro, así cada músculo sigue descansando ~3 min y la sesión cabe en menos tiempo (Belo 2020, en grapplers).
 export const PLANTILLAS = {
-  A: [['swing', 3], ['pm_hex', 3], ['press_incl', 3], ['jalon', 3], ['nordico', 2], ['tri_polea', 2], ['curl_mart', 2], ['colgarse', 2]],
-  B: [['cajon', 3], ['hack', 3], ['militar', 3], ['remo_barra', 3], ['copenhague', 2], ['tri_manc', 2], ['face_pull', 2], ['gemelos_pie', 2], ['farmer', 2]],
+  A: [['cajon', 3], ['hack', 4], ['pm_hex', 4], ['nordico', 3, 'copenhague'], ['copenhague', 2, 'nordico'], ['gemelos_pie', 3]],
+  B: [['balon_rot', 3], ['press_incl', 3, 'remo_barra'], ['remo_barra', 3, 'press_incl'], ['militar', 3, 'jalon'], ['jalon', 3, 'militar'],
+    ['curl_mart', 2, 'tri_polea'], ['tri_polea', 2, 'curl_mart'], ['face_pull', 2], ['colgarse', 2]],
 };
+export const PAR_DESC = 75;
+export const NOMBRE_SESION = { A: 'Pierna', B: 'Torso' };
+// Bloque de cada ejercicio según su prioridad (p).
+export const BLOQUE = p => p === 1 ? 'Explosividad' : p <= 3 ? 'Fuerza' : 'Músculo';
+// Series mínimas: un básico (p ≤ 3, explosivos incluidos) no baja de 3; prevención y accesorios, de 2.
+const minSeries = e => e.p <= 3 ? 3 : 2;
 
 const costo = (e, s) => s * ((e.w ?? 40) + e.d) + CAMBIO_SEG;
 
@@ -123,7 +134,7 @@ export function armarRutina(minutos, grupos, factor = 1, cambios = {}, plantilla
   const escala = e => ({ ...e, s: Math.max(2, Math.round(e.s * factor)) });
   const orden = [];
   if (plantilla) {
-    PLANTILLAS[plantilla.k].forEach(([id, s]) => { const e = ejDe(id); if (plantilla.potencia || e.p !== 1) orden.push(escala({ ...e, s: s ?? e.s })); });
+    PLANTILLAS[plantilla.k].forEach(([id, s, par]) => { const e = ejDe(id); if (plantilla.potencia !== false || e.p !== 1) orden.push(escala({ ...e, s: s ?? e.s, ...(par && { par, d: Math.min(e.d, PAR_DESC), dSolo: e.d }) })); });
     // Descarga (factor < 0,7): tope de series totales = factor × las de una sesión normal del mismo tiempo, quitando desde el final
     // (accesorios y agarre pueden salir; el resto queda en 2 series como mínimo). Si no, el tiempo sobrante se llenaría y el volumen no bajaría.
     if (factor < .7) {
@@ -141,11 +152,12 @@ export function armarRutina(minutos, grupos, factor = 1, cambios = {}, plantilla
   const mete = (e, disp) => { for (let s = e.s; s >= 2; s--) if (costo(e, s) <= disp) return s; return 0; };
   const hechas = new Map();
   if (plantilla) {
-    // Cuerpo completo: primero 2 series de cada ejercicio (básicos, prevención, explosivo, accesorios, agarre) mientras quepa, para que
-    // ningún patrón quede fuera; lo que sobra sube las series, básicos primero, hasta las de la plantilla.
-    const imp = e => [2, 3, 4, 1, 5, 6].indexOf(e.p);
+    // Pierna/Torso: primero el mínimo de cada ejercicio (3 series en básicos y explosivos, 2 en el resto), en orden de importancia
+    // (fuerza, explosivo, prevención, accesorios, agarre); lo que no cabe completo queda fuera, así un básico nunca baja a 2 series
+    // por falta de tiempo. Lo que sobra sube las series, básicos primero, hasta las de la plantilla.
+    const imp = e => [2, 3, 1, 4, 5, 6].indexOf(e.p);
     const porImp = [...orden].sort((a, b) => imp(a) - imp(b));
-    for (const e of porImp) if (e.s >= 2 && costo(e, 2) <= libre) { hechas.set(e.id, 2); libre -= costo(e, 2); }
+    for (const e of porImp) { const m = Math.min(e.s, minSeries(e)); if (m >= 2 && costo(e, m) <= libre) { hechas.set(e.id, m); libre -= costo(e, m); } }
     for (const e of porImp) while (hechas.has(e.id) && hechas.get(e.id) < e.s && costo(e, hechas.get(e.id) + 1) - costo(e, hechas.get(e.id)) <= libre) {
       libre -= costo(e, hechas.get(e.id) + 1) - costo(e, hechas.get(e.id)); hechas.set(e.id, hechas.get(e.id) + 1);
     }
@@ -156,7 +168,9 @@ export function armarRutina(minutos, grupos, factor = 1, cambios = {}, plantilla
     for (const e of orden.filter(e => e.p !== 4)) { const s = mete(e, libre - reserva); if (s) { hechas.set(e.id, s); libre -= costo(e, s); } }
     prev.forEach((e, i) => { const s = mete(e, libre - minPrev(prev.slice(i + 1))); if (s) { hechas.set(e.id, s); libre -= costo(e, s); } });
   }
-  const ej = orden.filter(e => hechas.has(e.id)).map(e => sustituir(e, cambios[e.id], hechas.get(e.id)));
+  // Si la pareja quedó fuera, el ejercicio vuelve a su descanso normal (y descuenta ese tiempo).
+  for (const e of orden) if (e.par && hechas.has(e.id) && !hechas.has(e.par)) { libre -= hechas.get(e.id) * (e.dSolo - e.d); e.d = e.dSolo; delete e.par; }
+  const ej = orden.filter(e => hechas.has(e.id)).map(e => ({ ...sustituir(e, cambios[e.id], hechas.get(e.id)), ...(e.par && { par: e.par, d: e.d }) }));
   return { ej, conAbs, sobraMin: Math.max(0, Math.floor(libre / 60)) };
 }
 
@@ -346,8 +360,8 @@ export const MOVILIDAD = ['Cuello: isometría 4 direcciones · 3 × 10 s', 'Puen
 export const ROUND = ['Sprawl × 5', 'Escape de cadera ida y vuelta', 'Swing kettlebell × 10', 'Oso (bear crawl) 10 m', 'Levantada técnica × 4', 'Burpee × 5'];
 
 export const FASES = {
-  base: { n: 'Base', factor: .75, rpe: '6-7', z2: 35,
-    obj: 'Adaptar tendones y articulaciones y construir la base aeróbica. Fuerza con 3–4 repeticiones en reserva (RPE 6–7); cardio en Z2.',
+  base: { n: 'Base', factor: 1, rpe: '6-7', z2: 35,
+    obj: 'Adaptar tendones y articulaciones y construir la base aeróbica. Mismas series que después (3–4 en los básicos), pero con 3–4 repeticiones en reserva (RPE 6–7); cardio en Z2.',
     fijas: ['fuerzaA', 'fuerzaB', 'z2'], variables: ['z2', 'movilidad'] },
   construccion: { n: 'Construcción', factor: 1, rpe: '7-8', z2: 40,
     obj: 'Subir la carga (RPE 7–8) y sumar intervalos en Z4 para la potencia aeróbica.',
@@ -385,10 +399,10 @@ export const segBloques = b => b.reduce((a, x) => a + x.seg, 0);
 // Una sesión del plan ajustada a los minutos disponibles.
 export function sesion(tipo, fase, min = 60) {
   const F = FASES[fase];
-  if (tipo === 'fuerzaA' || tipo === 'fuerzaB') { // cuerpo completo; core en A siempre y en B solo en Base (después entran los explosivos)
-    const k = tipo.slice(-1), potencia = fase !== 'base';
-    return { tipo: 'fuerza', i: '🏋️', n: `Fuerza ${k} · cuerpo completo`, min, plantilla: { k, potencia }, factor: F.factor, rpe: F.rpe, dura: true,
-      grupos: ['piernas', 'espalda', 'empuje', 'brazos', ...(k === 'A' || !potencia ? ['core'] : []), ...(potencia ? ['potencia'] : [])] };
+  if (tipo === 'fuerzaA' || tipo === 'fuerzaB') { // Pierna (A) o Torso (B): explosividad → fuerza → músculo → core, en todas las fases
+    const k = tipo.slice(-1);
+    return { tipo: 'fuerza', i: k === 'A' ? '🦵' : '💪', n: `Fuerza · ${NOMBRE_SESION[k]}`, min, plantilla: { k, potencia: true }, factor: F.factor, rpe: F.rpe, dura: true,
+      grupos: [...(k === 'A' ? ['piernas'] : ['espalda', 'empuje', 'brazos']), 'potencia', 'core'] };
   }
   if (tipo === 'z2') {
     const m = Math.min(F.z2, min);
@@ -409,8 +423,11 @@ export const minSesion = x => x.bloques ? Math.round(segBloques(x.bloques) / 60)
 
 // ---------- Metas de la semana: fijas (no se negocian) y variables (si el día da) ----------
 // Con deporte en la semana (fútbol, partido…), la sesión intensa fija pasa a Z2 variable: el partido ya es trabajo intermitente.
-export function metasSemana(fase, hayDeporte = false) {
-  const F = FASES[fase], lista = [...F.fijas.map(t => [t, true]), ...F.variables.map(t => [t, false])], n = {};
+// Fuera de la descarga se suma una 3.ª sesión de fuerza variable que alterna Pierna y Torso por semana (`semana` = n.º de semana del plan):
+// así cada zona se entrena 3 veces cada 2 semanas, o 2 por semana si se hacen 4 (ACSM 2026: ≥ 2 sesiones por semana por músculo).
+export function metasSemana(fase, hayDeporte = false, semana = 0) {
+  const F = FASES[fase], extra = fase === 'descarga' ? [] : [semana % 2 ? 'fuerzaB' : 'fuerzaA'];
+  const lista = [...F.fijas.map(t => [t, true]), ...[...extra, ...F.variables].map(t => [t, false])], n = {};
   const k = lista.findIndex(([t, f]) => f && (t === 'intervalos' || t === 'rounds'));
   if (hayDeporte && k >= 0) lista[k] = ['z2', false];
   return lista.map(([tipo, fija]) => { n[tipo] = (n[tipo] || 0) + 1; return { id: n[tipo] > 1 ? tipo + n[tipo] : tipo, tipo, fija }; });
@@ -464,7 +481,7 @@ export const horaHabitual = eventos => {
   const c = {}; for (const e of eventos.filter(e => esBloque(e.t || ''))) { const h = hhmm(+dia(e.ini)); c[h] = (c[h] || 0) + 1; }
   return Object.keys(c).sort((a, b) => c[b] - c[a])[0] ?? '19:30';
 };
-// Cuerpo completo: 60 min sin core; con core (A siempre, B en Base) 75 min, para que entren todos los patrones.
+// Pierna y Torso llevan core: 75 min, para que entren los 4 bloques (explosividad, fuerza, músculo, core).
 const minimo = (tipo, fase) => tipo.startsWith('fuerza') ? (sesion(tipo, fase).grupos.includes('core') ? 75 : 60) : minSesion(sesion(tipo, fase));
 
 // Reparte lo pendiente en los días que quedan. dias: [{fecha, d: dispDia, elegido?: {item, hora, min}, hecho?}].

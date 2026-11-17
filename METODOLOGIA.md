@@ -15,7 +15,7 @@ El plan es un bloque de **preparación física general → específica** que ter
 
 | Fase | Parte del plan | Fuerza | Cardio | Objetivo |
 |---|---|---|---|---|
-| Base | primer tercio | 75 % de las series, RPE 6–7 (3–4 repeticiones en reserva) | Z2 continuo 30–40 min | Adaptar tendones y articulaciones y construir la base aeróbica |
+| Base | primer tercio | 100 % de las series, RPE 6–7 (3–4 repeticiones en reserva) | Z2 continuo 30–40 min | Adaptar tendones y articulaciones y construir la base aeróbica |
 | Construcción | segundo tercio | 100 % de las series, RPE 7–8 (2–3 en reserva) | Intervalos 6 × 3 min en Z4 / 2 min suave | Potencia aeróbica y carga de fuerza |
 | Específica | último tercio | 85 % de las series, se mantiene la carga | Rounds de 5 min / 1 min de pausa, circuito de lucha en Z4–Z5 | Simular la demanda del combate |
 | Descarga | última semana | ≈ 55 % de las series (tope total), mismo kg, RPE 6–7 | 3 rounds y Z2 corto | Llegar descansado: bajar el volumen ~40 % y mantener la intensidad (Bosquet et al., 2007) |
@@ -32,16 +32,18 @@ No hay horario fijo. Cada semana tiene metas según la fase:
 
 | Fase | Fijas ⭐ (no se negocian) | Variables (si el día da) |
 |---|---|---|
-| Base | Fuerza A, Fuerza B, Z2 | Z2, movilidad |
-| Construcción | Fuerza A, Fuerza B, intervalos | Z2, movilidad |
-| Específica | Fuerza A, Fuerza B, rounds | Z2, rounds |
-| Descarga | Fuerza A, rounds | Z2, movilidad |
+| Base | Pierna, Torso, Z2 | 3.ª fuerza (Pierna o Torso), Z2, movilidad |
+| Construcción | Pierna, Torso, intervalos | 3.ª fuerza, Z2, movilidad |
+| Específica | Pierna, Torso, rounds | 3.ª fuerza, Z2, rounds |
+| Descarga | Pierna, Torso, rounds | Z2, movilidad |
+
+La 3.ª sesión de fuerza alterna por semana del plan: Pierna en las semanas pares y Torso en las impares.
 
 La app reparte lo pendiente en los días que quedan. Pone primero las fijas y después las variables, sin dos sesiones duras seguidas si se puede evitar. Usa los huecos libres del Google Calendar: todo evento es fijo salvo el bloque "Ejercicio", que la app puede mover. Cada sesión hecha descuenta su meta aunque se haga otro día, así el plan se reacomoda solo. El día anterior (o el mismo día) eliges la sesión, la hora y los minutos, y la app mueve el bloque en el calendario.
 
 ### Sesiones del plan
 
-- **Fuerza A / B**: cuerpo completo (ver §6). Usa la rutina por plantilla de la app, con las series multiplicadas por el factor de la fase.
+- **Pierna / Torso**: Explosividad → Fuerza → Músculo → Core (ver §6). Usa la rutina por plantilla de la app, con las series multiplicadas por el factor de la fase.
 - **Cardio Z2**: trote, bici, remo o elíptica. Se puede conversar en frases completas.
 - **Intervalos**: bici, remo o assault bike. 5 min de entrada en calor, 6 × (3 min Z4 + 2 min Z1) y 5 min de vuelta a la calma.
 - **Rounds**: circuito continuo de 5 min (sprawl, escape de cadera, swing, oso, levantada técnica, burpee) con 1 min de pausa, igual que los rounds de lucha.
@@ -97,13 +99,19 @@ La pestaña Entrenamiento tiene una sección «Acerca de» con la justificación
 - **Comida sin pesar**: `estimarTexto` calcula kcal y proteína con porciones típicas (valores orientativos, ±20 %).
 
 Aplicado después, a partir de la misma revisión:
-- **Cuerpo completo A/B** (`PLANTILLAS`): A = swing, peso muerto, press inclinado, jalón, nórdico, curl martillo, colgarse; B = salto al cajón, hack, press militar, remo con barra, Copenhague, face pull, farmer. Cada grupo se trabaja 2 veces por semana. Los explosivos entran desde Construcción; el core va en A siempre y en B solo en Base. Los básicos llevan 3 series (el ACSM 2026 indica 2-3) y la prevención 2. Las sesiones con core piden 75 min en el calendario (60 sin core) para que entren todos los patrones.
-- **Descarga real**: se mantienen A y B (`fijas: fuerzaA, fuerzaB, rounds`) con las mismas cargas y RPE 6-7, y un tope de series totales = factor × las de Construcción (la prevención se queda; accesorios y agarre pueden salir). Resultado: 10 series contra 18 (−44 %).
+- **Pierna / Torso** (`PLANTILLAS`, desde nov-2026; antes era cuerpo completo A/B). La estructura sale de un reel de @oriol.jiujitsu (preparador de BJJ): *«Todos tus entrenamientos van a empezar con explosividad. Los días de pierna vas a hacer saltos a máxima potencia y los días de torso lanzamientos de balón a máxima potencia. Posteriormente pasarás al bloque de fuerza: los días de piernas, sentadillas y pesos muertos, y los de torso empujes verticales, empujes horizontales, tracciones verticales y tracciones horizontales. Después del bloque de fuerza pondrás ejercicios para trabajar tus músculos débiles: brazos, femoral, gemelo… Y acabarás todas tus sesiones con trabajo de core, tanto flexión de columna como rotación.»* Es práctica de entrenador, sin estudio detrás, y no da series ni repeticiones; la dosis sale de la revisión:
+  - **Pierna (A)**: salto al cajón 3 × 4 · hack 4 × 6-8 · peso muerto hexagonal 4 × 4-6 · nórdico 3 ↔ Copenhague 2 · gemelos 3 · core.
+  - **Torso (B)**: lanzamiento rotacional de balón 3 × 6 por lado · press inclinado 3 ↔ remo con barra 3 · press militar 3 ↔ jalón 3 · curl martillo 2 ↔ tríceps en polea 2 · face pull 2 · colgarse 2 · core.
+  - **Series mínimas** (`minSeries`): básicos y explosivos 3, el resto 2. Primero entra el mínimo de cada ejercicio en orden de importancia (fuerza, explosivo, prevención, accesorios, agarre) y lo que no cabe completo queda fuera; luego se suben las series hasta las de la plantilla. Así un básico nunca queda en 2 series por falta de tiempo (el problema anterior: Base × 0,75 y 9 ejercicios en 60 min dejaban todo en 2 series).
+  - **Series alternadas** (`par`, `PAR_DESC` = 75 s): empuje ↔ tracción, bíceps ↔ tríceps, femoral ↔ aductor. En grapplers rindieron el mismo volumen-carga en menos tiempo (Belo 2020) y el ACSM 2026 no encontró efecto de la estructura de las series. Cada músculo sigue descansando ~3 min. Si la pareja no entra, vuelve al descanso normal.
+  - **Explosividad en todas las fases**, incluida Base (pocas repeticiones, máxima intención, recuperación casi completa). Core en las dos sesiones. Piden 75 min en el calendario: en 75 min entran los 4 bloques (Torso 17 series, Pierna 14); con 90 min, todo (19-21).
+  - **Volumen**: cada Torso da 6 series de dorsales y cada Pierna 7 de sentadilla + peso muerto. Con la 3.ª sesión variable, ≈ 9 series semanales de dorsales (12 con 4 sesiones), cerca del umbral de 10.
+- **Descarga real**: se mantienen Pierna y Torso (`fijas: fuerzaA, fuerzaB, rounds`), sin 3.ª sesión de fuerza, con las mismas cargas y RPE 6-7, y un tope de series totales = factor × las de Construcción (la prevención se queda; accesorios y agarre pueden salir). Resultado con 90 min: Pierna 10 contra 19 series y Torso 12 contra 21 (−43 a −47 %).
 - **Doble progresión**: repeticiones en rangos (`4-6`, `6-8`, `8-10`…). Se sube la carga solo si todas las series llegaron al tope y el RPE de la sesión (que ahora se registra al terminar) no pasó del objetivo de la fase (`FASES.*.rpe`). El paso es ≈ 5 % entre 1 y 2,5 kg (`paso`); los explosivos mantienen la carga.
 - **Series de aproximación** (`aproximacion`): 50 % × 5, 70 % × 3 y 85 % × 1 en el primer básico; 50 % × 5 y 70 % × 3 en los demás. No cuentan como series ni en el tiempo estimado (≈ 2-3 min).
 - **Separación fuerza-cardio ≥ 6 h**: `distribuir` ya deja una sola sesión por día y los días de deporte solo reciben movilidad, así que no se mezclan en el mismo día.
 
-Límites: cada ejercicio concreto se hace 1 vez por semana (lo que se repite es el grupo muscular); en Construcción son ≈ 6 series directas por grupo por semana, bajo las 10 que se piden para hipertrofia. En el modo libre («Entrena libre») la rutina sigue armándose por grupos, sin plantilla ni tope de descarga.
+Límites: con solo las 2 sesiones fijas, cada zona se entrena 1 vez por semana (bajo las ≥ 2 del ACSM 2026); por eso la 3.ª sesión variable importa. El pecho recibe menos volumen directo (3 series por Torso) que la espalda: es una elección por lo que exige el BJJ (tracción). En el modo libre («Entrena libre») la rutina sigue armándose por grupos, sin plantilla ni tope de descarga.
 
 ## Referencias
 

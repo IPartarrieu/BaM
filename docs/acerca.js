@@ -3,6 +3,11 @@
 export const INTRO = 'En qué evidencia se apoya la rutina que te propone la app. Cada tema dice qué tan sólida es (fuerte, moderada o débil) y de dónde viene. Es una guía de entrenamiento, no consejo médico: si algo te duele, consulta a un profesional.';
 
 export const SECCIONES = [
+  { t: 'Estructura: Pierna y Torso', i: [
+    'La forma de la sesión viene de @oriol.jiujitsu, que prepara a practicantes de BJJ: días de pierna y días de torso, y cada sesión en cuatro bloques. 1) Explosividad: saltos a máxima potencia en pierna y lanzamientos de balón medicinal en torso. 2) Fuerza: sentadilla y peso muerto en pierna; empuje vertical, empuje horizontal, tracción vertical y tracción horizontal en torso. 3) Músculo: puntos débiles (femoral, aductor, gemelo, brazos, deltoide posterior, agarre). 4) Core: flexión y rotación de columna.',
+    'Eso es práctica de un entrenador, no un estudio. Las series, repeticiones, descansos y cargas no los da él: salen de la evidencia de las secciones siguientes. Todos los básicos llevan 3 o 4 series; ninguno baja a 2 por falta de tiempo (si no cabe completo, se recorta un accesorio).',
+    'La semana tiene Pierna y Torso fijas y una 3.ª sesión de fuerza variable que alterna Pierna y Torso: cada zona se entrena 3 veces cada 2 semanas, o 2 por semana si haces las 4.'],
+    ev: 'la estructura es práctica de entrenador (sin estudio); la dosis, en las secciones siguientes', f: ['Currier 2026', 'Belo 2020'] },
   { t: 'Tipo de entrenamiento', i: [
     'La base es fuerza con ejercicios multiarticulares y cargas altas: bisagra de cadera, sentadilla, empuje y tracción. Es lo que más fuerza da, y la fuerza máxima se asocia con el rendimiento en BJJ.',
     'Barra libre y máquina dan resultados parecidos. Por eso la rutina mezcla ambos y deja cambiar un ejercicio por otro equivalente.',
@@ -17,21 +22,24 @@ export const SECCIONES = [
     ev: 'fuerte en carga alta y en hipertrofia independiente de la carga; moderada en repeticiones en reserva; moderada-débil en RPE 6-7 al retomar (inferido, no hay ensayos en quien vuelve)', f: ['Currier 2026', 'Currier 2023', 'Lopez 2021', 'Schoenfeld 2021', 'Robinson 2024', 'Grgic 2022', 'Refalo 2023', 'Zourdos 2016', 'Helms 2016', 'Bosquet 2013'] },
   { t: 'Volumen y frecuencia', i: [
     'Más series por semana dan más músculo hasta alrededor de 10 por grupo, con ganancias cada vez menores. Para la fuerza, sumar series rinde menos.',
-    'Para la fuerza conviene entrenar cada músculo al menos 2 veces por semana. Por eso el plan es de cuerpo completo: Fuerza A (peso muerto, press inclinado, jalón) y Fuerza B (hack, press militar, remo con barra) trabajan los mismos grupos con ejercicios distintos. Son 2 o 3 series por ejercicio.',
-    'Con eso cada grupo recibe cerca de 6 series directas por semana en Construcción: suficiente para ganar fuerza, pero menos de las 10 que se piden para ganar músculo.',
+    'Para la fuerza conviene entrenar cada músculo al menos 2 veces por semana, aunque con el volumen igualado la frecuencia pesa poco. Por eso hay 2 sesiones fijas (Pierna y Torso) más una 3.ª variable que alterna entre ellas, y cada básico lleva 3 o 4 series (el ACSM indica 2 a 3 como mínimo eficaz).',
+    'Cada Torso da 6 series de dorsales (remo y jalón) y cada Pierna 7 de piernas (sentadilla y peso muerto) más femoral y aductor. Con 3 sesiones por semana son unas 9 series semanales de dorsales; con 4, 12. Antes eran 2 series por ejercicio y unas 5 por grupo: corto para ganar músculo.',
+    'La fase Base no quita series: baja el esfuerzo (RPE 6-7). Bajar a 2 series en Base dejaba el volumen bajo justo cuando el tendón necesita carga para adaptarse.',
     'Los tendones se adaptan según la magnitud de la carga, así que incluso la fase Base usa cargas reales, solo que lejos del fallo.'],
     ev: 'fuerte en la relación entre volumen y músculo; moderada-fuerte en frecuencia; moderada en tendones', f: ['Currier 2026', 'Schoenfeld 2017', 'Pelland 2026', 'Androulakis-Korakakis 2020', 'Schoenfeld 2019', 'Grgic 2018 (frecuencia)', 'Bohm 2015'] },
   { t: 'Orden de los ejercicios', i: [
-    'Lo que se hace primero se hace con más fuerza y mejora más. Por eso la rutina va en este orden: explosivos (saltos, swing, lanzamientos), básicos pesados de piernas, básicos de tren superior, prevención (nórdico, Copenhague), accesorios, agarre y core al final.',
+    'Lo que se hace primero se hace con más fuerza y mejora más. Por eso la rutina va en este orden: explosividad (saltos o lanzamientos, sin fatiga previa), fuerza (básicos pesados), músculo (prevención con nórdico y Copenhague, accesorios y agarre) y core al final.',
     'El agarre va después porque cansa el antebrazo y limitaría el peso muerto, el remo y el jalón.',
     'Si el tiempo no alcanza, se recorta desde el final de la lista. La prevención reserva su lugar antes de repartir el resto.',
-    'Intercalar grupos que no se fatigan entre sí (por ejemplo espalda y pecho) rinde el mismo volumen en menos tiempo; se probó en practicantes de BJJ. Para ganar músculo el orden no cambió los resultados.'],
+    'Intercalar grupos que no se fatigan entre sí rinde el mismo volumen en menos tiempo; se probó en practicantes de grappling. Por eso en Torso se alternan press inclinado con remo y press militar con jalón, y en los accesorios curl con tríceps y nórdico con Copenhague: haces una serie de uno, descansas 75 s, una del otro, y así. Cada músculo sigue descansando unos 3 minutos. Sin esto, los cuatro bloques no caben en 75 minutos.',
+    'Si el tiempo no alcanza, se prioriza la fuerza, luego la explosividad y después los accesorios. Para ganar músculo el orden no cambió los resultados.'],
     ev: 'moderada en que lo prioritario va primero; débil en explosivos primero y agarre al final (inferencia)', f: ['Currier 2026', 'ACSM 2009', 'Simão 2012', 'Nunes 2021', 'Belo 2020', 'Paz 2017', 'Trindade 2022'] },
   { t: 'Descanso entre series', i: [
     'Básicos pesados: 2 a 3 minutos. Peso muerto 3 min, press inclinado 2,5 min, y 2 min en hack, hip thrust, nórdico, jalón, remo con barra, press militar y fondos. En un ensayo con hombres entrenados, descansar 3 minutos dio más fuerza y más músculo que descansar 1.',
     'Accesorios (curls, face pull): 60 a 90 segundos. Pasados los 90 s no hay diferencia en hipertrofia.',
     'Explosivos: recuperación casi completa para no perder velocidad. Salto al cajón 2,5 min; swing y lanzamientos 90 s.',
     'Ejercicios por lado o isométricos (Copenhague, remo unilateral, landmine): 60 a 90 s, porque un lado descansa mientras trabaja el otro.',
+    'Series alternadas (ejercicios en pareja): 75 s entre un ejercicio y el otro; así cada uno vuelve a trabajar a los ~3 min.',
     'Abdominales: 5 s entre ejercicios y 90 s entre rondas, como circuito de resistencia local. El temporizador de la app usa estos tiempos.'],
     ev: 'moderada en básicos y accesorios; débil-moderada en explosivos (posicionamiento, sin meta-análisis)', f: ['ACSM 2009', 'Schoenfeld 2016', 'Grgic 2018 (descanso)', 'Singer 2024'] },
   { t: 'Descanso entre sesiones y con otros entrenamientos', i: [
@@ -39,7 +47,7 @@ export const SECCIONES = [
     'Fuerza y cardio juntos no estorban la fuerza máxima ni el músculo, pero sí la fuerza explosiva. Conviene separarlos al menos 6 horas y, si van el mismo día, hacer primero la fuerza. La app evita poner dos sesiones duras seguidas cuando puede.',
     'Dormir poco varias noches baja la fuerza en ejercicios multiarticulares. Si pasó, baja el RPE un punto en los básicos.',
     'Antes de la meta: bajar el volumen entre un 41 y un 60 % manteniendo la intensidad y la frecuencia da el mejor resultado. Parar del todo una semana no ayudó.',
-    'Por eso la semana de descarga mantiene Fuerza A y B con las mismas cargas, pero con cerca de la mitad de las series: los accesorios y el agarre se quitan y la prevención se queda.'],
+    'Por eso la semana de descarga mantiene Pierna y Torso con las mismas cargas, pero con cerca de la mitad de las series y sin la 3.ª sesión de fuerza: los accesorios y el agarre se quitan y la prevención se queda.'],
     ev: 'fuerte en que cardio y fuerza son compatibles; moderada en la interferencia con potencia; moderada-débil en las 6 h, el sueño y la descarga', f: ['Refalo 2023', 'Schumann 2022', 'Wilson 2012', 'Murach 2016', 'Robineau 2016', 'Knowles 2018', 'Bosquet 2007', 'Coleman 2024'] },
   { t: 'Calentamiento y elongación', i: [
     'Antes: movilidad dinámica y series de aproximación, sin llegar a cansarte. La app las calcula con la carga del día: en el primer básico 50 % × 5, 70 % × 3 y 85 % × 1, y en los demás básicos 50 % × 5 y 70 % × 3. No cuentan como series de trabajo. Calentar mejora el rendimiento en la mayoría de los estudios.',

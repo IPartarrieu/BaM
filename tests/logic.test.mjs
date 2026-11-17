@@ -97,10 +97,11 @@ ev.push({ t: 'Feña: Viaje a Stgo.', ini: '2026-10-29T19:00', fin: '2026-10-29T2
   { t: 'Bloque de trabajo', ini: '2026-10-30T08:15', fin: '2026-10-30T14:00' }, { t: 'Scout', ini: '2026-10-31T15:00', fin: '2026-10-31T18:00' },
   { t: 'Paseadora', ini: '2026-10-27T19:15', fin: '2026-10-27T20:00' }, { t: 'Bruno', ini: '2026-10-27T20:00', fin: '2026-10-27T21:00' });
 // Metas de la semana: fijas y variables; con fútbol la intensa fija pasa a Z2 variable
-assert.deepEqual(L.metasSemana('construccion').map(x => [x.id, x.fija]), [['fuerzaA', true], ['fuerzaB', true], ['intervalos', true], ['z2', false], ['movilidad', false]]);
-assert.deepEqual(L.metasSemana('especifica', true).map(x => x.id), ['fuerzaA', 'fuerzaB', 'z2', 'z2b'.replace('b', '2'), 'rounds']);
+assert.deepEqual(L.metasSemana('construccion').map(x => [x.id, x.fija]), [['fuerzaA', true], ['fuerzaB', true], ['intervalos', true], ['fuerzaA2', false], ['z2', false], ['movilidad', false]]);
+assert.deepEqual(L.metasSemana('construccion', false, 1).filter(x => !x.fija)[0].id, 'fuerzaB2'); // la 3.ª de fuerza alterna Pierna/Torso
+assert.deepEqual(L.metasSemana('especifica', true).map(x => x.id), ['fuerzaA', 'fuerzaB', 'z2', 'fuerzaA2', 'z2b'.replace('b', '2'), 'rounds']);
 const items = L.metasSemana('base');
-assert.deepEqual(L.pendientes(items, [{ item: 'fuerzaB', tipo: 'fuerza' }, { tipo: 'z2' }, { series: [] }]).map(x => x.id), ['z2b'.replace('b', '2'), 'movilidad']);
+assert.deepEqual(L.pendientes(items, [{ item: 'fuerzaB', tipo: 'fuerza' }, { tipo: 'z2' }, { series: [] }]).map(x => x.id), ['fuerzaA2', 'z2b'.replace('b', '2'), 'movilidad']);
 
 // Día con el bloque libre: se queda en el bloque. Martes 27: Paseadora y Bruno lo tapan → hueco más cercano a 19:30
 const lun = L.dispDia(ev, '2026-10-26');
@@ -118,7 +119,7 @@ assert.equal(L.horaHabitual(ev), '19:30');
 const dias = ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01'].map(f => ({ fecha: f, d: L.dispDia(ev, f, { ahora: new Date('2026-10-29T10:00') }) }));
 const rep = L.distribuir('base', L.metasSemana('base', true), dias);
 assert.deepEqual(rep.dias.map(d => [d.item?.id, d.hora, d.min]), [['movilidad', '20:00', 25], ['fuerzaA', '19:30', 75], ['z2', '19:30', 35], ['fuerzaB', '19:30', 75]]);
-assert.deepEqual(rep.sinLugar.map(x => x.id), ['z22']); // la variable que no cupo queda a la vista
+assert.deepEqual(rep.sinLugar.map(x => x.id), ['fuerzaA2', 'z22']); // las variables que no cupieron queda a la vista
 // El usuario fija el sábado a las 10:00 con fuerza B (el día anterior): se respeta y hay que mover/crear el bloque
 const rep2 = L.distribuir('base', L.metasSemana('base'), dias.map(x => x.fecha === '2026-10-31' ? { ...x, elegido: { item: 'fuerzaB', hora: '10:00', min: 75 } } : x));
 assert.deepEqual([rep2.dias[2].item.id, rep2.dias[2].hora, rep2.dias[2].min, rep2.dias[2].mover, rep2.dias[2].elegido], ['fuerzaB', '10:00', 75, true, true]);
@@ -178,34 +179,52 @@ console.log('ok');
   assert.ok(!L.ejerciciosDe('aductores').some(e => e.alt));
 }
 
-// Cuerpo completo A/B: cada sesión cubre bisagra/sentadilla, empuje y tracción; las dos juntas trabajan cada grupo 2 veces por semana
+// Pierna (A) / Torso (B) con la estructura de @oriol.jiujitsu: explosividad → fuerza → músculo → core
 {
   const arma = (tipo, fase, min) => { const s = L.sesion(tipo, fase, min); return L.armarRutina(min, s.grupos, s.factor, {}, s.plantilla); };
   const pats = r => new Set(r.ej.map(e => e.pat));
-  for (const [tipo, min] of [['fuerzaA', 75], ['fuerzaB', 60]]) {
-    const r = arma(tipo, 'construccion', min), p = pats(r);
-    assert.ok(['empuje_h', 'empuje_v'].some(x => p.has(x)) && ['traccion_h', 'traccion_v'].some(x => p.has(x)) && (p.has('bisagra') || p.has('sentadilla')), tipo);
-    assert.ok(r.ej.some(e => e.id === 'nordico' || e.id === 'copenhague'), tipo);   // prevención siempre
-    assert.equal(r.ej[0].p, 1);                                                     // explosivo primero
+  for (const fase of ['base', 'construccion', 'especifica']) {
+    const P = arma('fuerzaA', fase, 75), T = arma('fuerzaB', fase, 75);
+    // Todas empiezan con explosividad: saltos en pierna, lanzamiento de balón en torso (también en Base)
+    assert.equal(P.ej[0].id, 'cajon', fase); assert.equal(T.ej[0].id, 'balon_rot', fase);
+    // Fuerza: sentadilla y peso muerto / empujes y tracciones verticales y horizontales
+    assert.ok(pats(P).has('sentadilla') && pats(P).has('bisagra'), fase);
+    for (const x of ['empuje_h', 'empuje_v', 'traccion_h', 'traccion_v']) assert.ok(pats(T).has(x), fase + x);
+    // Ningún básico ni explosivo baja de 3 series (lo de hoy: 2 series por ejercicio)
+    for (const e of [...P.ej, ...T.ej].filter(e => e.p <= 3)) assert.ok(e.s >= 3, `${fase} ${e.id} ${e.s}`);
+    // Músculo: femoral/aductor en pierna, brazos en torso; core al final de ambas
+    assert.ok(P.ej.some(e => e.id === 'nordico') && T.ej.some(e => e.pat === 'flexion_codo' || e.pat === 'extension_codo'), fase);
+    assert.ok(P.conAbs && T.conAbs);
+    // Orden por bloques: explosividad, fuerza, músculo
+    const orden = r => r.ej.map(e => ['Explosividad', 'Fuerza', 'Músculo'].indexOf(L.BLOQUE(e.p)));
+    for (const r of [P, T]) assert.deepEqual(orden(r), [...orden(r)].sort((x, y) => x - y));
   }
-  const gA = new Set(L.sesion('fuerzaA', 'base').grupos), gB = new Set(L.sesion('fuerzaB', 'base').grupos);
-  for (const g of ['piernas', 'espalda', 'empuje', 'brazos']) assert.ok(gA.has(g) && gB.has(g), g);
-  // Base: sin explosivos; con core en A y B. Construcción: explosivos y core solo en A
-  assert.ok(!arma('fuerzaA', 'base', 75).ej.some(e => e.p === 1) && L.sesion('fuerzaB', 'base').grupos.includes('core'));
-  assert.ok(arma('fuerzaB', 'construccion', 60).ej.some(e => e.p === 1) && !L.sesion('fuerzaB', 'construccion').grupos.includes('core'));
-  // Las sesiones con core piden 75 min para que entren todos los patrones
+  assert.equal(L.sesion('fuerzaA', 'base').n, 'Fuerza · Pierna'); assert.equal(L.sesion('fuerzaB', 'base').n, 'Fuerza · Torso');
+  // Series alternadas: empuje ↔ tracción con descanso corto; si la pareja no entra, vuelve al descanso normal
+  const T = arma('fuerzaB', 'construccion', 75), press = T.ej.find(e => e.id === 'press_incl');
+  assert.equal(press.par, 'remo_barra'); assert.equal(press.d, L.PAR_DESC);
+  const T60 = arma('fuerzaB', 'construccion', 60);
+  assert.ok(T60.ej.every(e => !e.par || T60.ej.some(x => x.id === e.par)));
+  const curl = T.ej.find(e => e.id === 'curl_mart');
+  if (curl && !T.ej.some(e => e.id === 'tri_polea')) assert.ok(!curl.par && curl.d === 75);
+  // Cambiar un ejercicio en pareja conserva la pareja y el descanso corto
+  const c = L.armarRutina(75, L.sesion('fuerzaB', 'construccion').grupos, 1, { remo_barra: 'remo_polea' }, L.sesion('fuerzaB', 'construccion').plantilla);
+  const rp = c.ej.find(e => e.id === 'remo_polea'); assert.ok(rp && rp.par === 'press_incl' && rp.orig === 'remo_barra' && rp.d === L.PAR_DESC);
+  // Las sesiones con core piden 75 min en el calendario
   const dia = f => ({ fecha: f, d: L.dispDia([], f, { ahora: new Date('2026-10-26T06:00') }) });
   const rd = L.distribuir('construccion', L.metasSemana('construccion'), ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30'].map(dia));
-  assert.deepEqual(rd.dias.filter(d => d.item?.tipo === 'fuerzaA' || d.item?.tipo === 'fuerzaB').map(d => [d.item.id, d.min >= (d.item.id === 'fuerzaA' ? 75 : 60)]).sort().map(x => x[1]), [true, true]);
-  // Descarga real: el volumen baja ≥ 40 % respecto de Construcción con las mismas cargas, y se mantienen A y B
+  assert.ok(rd.dias.filter(d => d.item?.tipo.startsWith('fuerza')).every(d => d.min >= 75));
+  // Descarga real: el volumen baja ≥ 40 % respecto de Construcción con las mismas cargas, y se mantienen Pierna y Torso
   const total = r => r.ej.reduce((n, e) => n + e.s, 0);
   for (const tipo of ['fuerzaA', 'fuerzaB']) {
     const c = total(arma(tipo, 'construccion', 90)), d = total(arma(tipo, 'descarga', 90));
     assert.ok(d <= Math.round(c * .6), `${tipo}: ${d} vs ${c}`);
-    assert.ok(arma(tipo, 'descarga', 90).ej.some(e => e.id === 'nordico' || e.id === 'copenhague')); // la prevención no se quita
   }
+  assert.ok(arma('fuerzaA', 'descarga', 90).ej.some(e => e.id === 'nordico')); // la prevención no se quita
   assert.deepEqual(L.metasSemana('descarga').filter(x => x.fija).map(x => x.id), ['fuerzaA', 'fuerzaB', 'rounds']);
+  assert.ok(!L.metasSemana('descarga').some(x => x.id === 'fuerzaA2' || x.id === 'fuerzaB2')); // sin 3.ª de fuerza en descarga
   assert.deepEqual(['base', 'construccion', 'especifica', 'descarga'].map(f => L.FASES[f].rpe), ['6-7', '7-8', '7-8', '6-7']);
+  assert.equal(L.FASES.base.factor, 1); // Base baja el RPE, no las series
   // Modo libre: sigue intercalando grupos sin plantilla
   assert.ok(L.armarRutina(90, ['espalda', 'empuje']).ej.length > 0);
 }
@@ -235,15 +254,12 @@ console.log('ok tonelaje');
   assert.ok(L.alternativas({ id: 'remo_barra' }, r.ej).some(x => x.id === 'remo_inv'));
 }
 
-// Cuerpo completo: aunque falte tiempo entran empuje, tracción, pierna y tríceps directo; los dos días juntos cubren el tríceps y los gemelos
+// Pierna + Torso juntos cubren todos los músculos (con 90 min); Torso cubre los 4 patrones aunque haya 60 min
 {
   const arma = (k, min, fase = 'construccion') => { const s = L.sesion('fuerza' + k, fase, min); return L.armarRutina(min, s.grupos, s.factor, {}, s.plantilla); };
-  for (const [k, min] of [['A', 75], ['A', 60], ['B', 60]]) {
-    const r = arma(k, min), pat = new Set(r.ej.map(e => e.pat));
-    assert.ok(['empuje_h', 'empuje_v'].some(x => pat.has(x)) && ['traccion_h', 'traccion_v'].some(x => pat.has(x)) && (pat.has('bisagra') || pat.has('sentadilla')), k + min);
-  }
-  assert.ok(arma('A', 75).ej.some(e => e.m[0] === 'triceps') && arma('B', 60).ej.some(e => e.m[0] === 'triceps'));
-  const dos = [...arma('A', 90).ej, ...arma('B', 90).ej, ...L.ABS].map(e => e.m[0]);
-  for (const m of ['triceps', 'gemelos', 'biceps', 'pectorales', 'dorsales', 'cuadriceps', 'isquios', 'gluteos', 'aductores', 'deltoides_post']) assert.ok(dos.includes(m), m);
+  const pat = new Set(arma('B', 60).ej.map(e => e.pat));
+  for (const x of ['empuje_h', 'empuje_v', 'traccion_h', 'traccion_v']) assert.ok(pat.has(x), x);
+  const dos = [...arma('A', 90).ej, ...arma('B', 90).ej, ...L.ABS].flatMap(e => e.m);
+  for (const m of ['triceps', 'gemelos', 'biceps', 'pectorales', 'dorsales', 'cuadriceps', 'isquios', 'gluteos', 'aductores', 'deltoides_post', 'antebrazos', 'oblicuos']) assert.ok(dos.includes(m), m);
 }
 console.log('ok alternativas y cobertura');

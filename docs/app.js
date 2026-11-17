@@ -7,6 +7,9 @@ const COORD_DEF = [-36.83, -73.05]; // Concepción, si no hay GPS
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const nombreEj = id => Object.values(L.GRUPOS).flatMap(G => G.ej).concat(L.ABS).find(e => e.id === id)?.n ?? id;
+// Pareja de series alternadas: el ejercicio que hoy ocupa el lugar de e.par.
+const pareja = (e, lista) => e.par ? (lista.find(x => (x.orig ?? x.id) === e.par)?.n ?? nombreEj(e.par)) : null;
+const nombreSesion = pl => pl.k in L.NOMBRE_SESION ? L.NOMBRE_SESION[pl.k] : pl.k;
 
 let db = cargar();
 let tab = db.actual ? 'hoy' : 'inicio';
@@ -67,7 +70,7 @@ function semana(fecha = new Date()) {
   const l = L.lunes(fecha), hoy = diaHoy(), fin = L.sumarDias(l, 6) < db.meta.fecha ? L.sumarDias(l, 6) : db.meta.fecha;
   const ev = db.cal.ev, deporteSemana = ev.some(e => L.lunes(e.ini) === l && L.RE_DEPORTE.test(e.t || '')) ||
     db.actividad.some(a => L.lunes(a.fecha) === l && /fútbol|bjj/i.test(a.tipo));
-  const items = L.metasSemana(est.fase, deporteSemana);
+  const items = L.metasSemana(est.fase, deporteSemana, est.semana);
   const hechas = db.sesiones.filter(s => L.lunes(s.fecha) === l);
   const pend = L.pendientes(items, hechas);
   const fechas = []; for (let f = hoy > l ? hoy : l; f <= fin; f = L.sumarDias(f, 1)) fechas.push(f);
@@ -92,7 +95,7 @@ function tarjetaMeta() {
 function ejerciciosPlan(ses, f) {
   if (ses?.tipo !== 'fuerza') return '';
   const r = L.armarRutina(ses.min, ses.grupos, ses.factor, form.plan === f ? form.sust : {}, ses.plantilla);
-  return `<ul class="lista">${r.ej.map(e => `<li>${esc(e.n)} · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''}</li>`).join('')}${r.conAbs ? '<li>🔥 Core: abdominales con disco</li>' : ''}</ul>`;
+  return `<ul class="lista">${r.ej.map(e => `<li>${ses.plantilla ? `<small class="sub">${L.BLOQUE(e.p)}</small> ` : ''}${esc(e.n)} · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''}${e.par ? ` · alterna con ${esc(pareja(e, r.ej))}` : ''}</li>`).join('')}${r.conAbs ? `<li>${ses.plantilla ? '<small class="sub">Core</small> ' : ''}🔥 Abdominales con disco (flexión y rotación)</li>` : ''}</ul>`;
 }
 
 function tarjetaHoy(hoy) {
@@ -300,10 +303,11 @@ function panelCambio(e, enRutina, act) {
 
 function vistaPlan(plan) {
   if (!plan.ej.length && !plan.conAbs) return `<div class="card"><h2>Rutina propuesta</h2><div class="sub">No alcanza el tiempo para ejercicios: sube los minutos o quita los abdominales.</div></div>`;
-  return `<div class="card" id="rutina"><h2>Rutina propuesta${form.plantilla ? ` · Fuerza ${form.plantilla.k} (cuerpo completo)` : ''}</h2>
+  return `<div class="card" id="rutina"><h2>Rutina propuesta${form.plantilla ? ` · ${nombreSesion(form.plantilla)}` : ''}</h2>
+    ${form.plantilla ? '<div class="sub">Explosividad → Fuerza → Músculo → Core. Los ejercicios en pareja se alternan: una serie de cada uno, descansando entre medio.</div>' : ''}
     ${form.rpe ? `<div class="sub">Esfuerzo objetivo: RPE ${form.rpe}, o sea dejar ${10 - L.tope(form.rpe)} a ${10 - L.piso(form.rpe)} repeticiones sin hacer. Sube la carga solo si completas el tope de repeticiones.</div>` : ''}<ul class="lista">
     <li>Calentamiento de articulaciones · 5 min</li>
-    ${plan.ej.map(e => `<li><b style="color:var(--txt)">${e.n}</b> · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · ${kgTxt(e, L.sugerirKg(db.sesiones, e, rpeMax(form.rpe)))}
+    ${plan.ej.map(e => `<li>${form.plantilla ? `<small class="sub">${L.BLOQUE(e.p)}</small><br>` : ''}<b style="color:var(--txt)">${e.n}</b> · ${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · ${kgTxt(e, L.sugerirKg(db.sesiones, e, rpeMax(form.rpe)))}${e.par ? ` · ↔ alterna con ${esc(pareja(e, plan.ej))}` : ''}
       <button class="mini" style="background:var(--panel2);padding:4px 10px;font-size:13px" data-act="cambiar" data-v="${e.id}" aria-label="Cambiar ${esc(e.n)}">↔ Cambiar</button>${form.cambiando === e.id ? panelCambio(e, plan.ej, 'sustituir') : ''}</li>`).join('')}
     ${plan.conAbs ? `<li><b style="color:var(--txt)">🔥 Core: abdominales con disco</b> · ${L.ABS_RONDAS} rondas fijas · ${Math.round(L.ABS_SEG / 60)} min</li>` : ''}
     <li>Elongar · 5 min</li></ul>
@@ -316,7 +320,7 @@ function vistaEntreno() {
   const a = db.actual;
   const total = a.ej.reduce((n, e) => n + e.s, 0) + (a.abs ? L.ABS_RONDAS * L.ABS.length : 0);
   const hechas = Object.keys(a.hechos).length;
-  return `<h1>${a.plantilla ? `🏋️ Fuerza ${a.plantilla.k} · cuerpo completo` : a.grupos.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' + ')}</h1>
+  return `<h1>${a.plantilla ? `🏋️ ${nombreSesion(a.plantilla)}` : a.grupos.map(g => L.GRUPOS[g].icono + ' ' + L.GRUPOS[g].nombre).join(' + ')}</h1>
   <div class="sub">Plan ${a.min} min · <span id="reloj">${transcurrido()}</span> · ${hechas}/${total} series · ${fmtKg(L.tonelaje(seriesHechas(a)))}${a.rpe ? ` · esfuerzo objetivo RPE ${a.rpe}` : ''}</div>
   <div class="barra"><i style="width:${hechas / total * 100}%"></i></div>
   ${bloqueFijo('cal', '1 · Calentamiento de articulaciones', L.CALENTAMIENTO)}
@@ -409,7 +413,8 @@ function tarjetaEj(e, n) {
   }).join('');
   const fuertes = a.ej.filter(x => x.p === 2 || x.p === 3), aprox = e.kg === null ? [] : L.aproximacion(+e.kgSug, fuertes[0]?.id === e.id ? 3 : fuertes.some(x => x.id === e.id) ? 2 : 0);
   const sinEmpezar = !Array.from({ length: e.s }, (_, i) => a.hechos[`${e.id}:${i}`]).some(Boolean);
-  return `<div class="card bloque ${todas ? 'ok' : ''}"><h3>2.${n + 1} · ${e.n}</h3>
+  return `<div class="card bloque ${todas ? 'ok' : ''}"><h3>2.${n + 1} · ${a.plantilla ? L.BLOQUE(e.p) + ': ' : ''}${e.n}</h3>
+    ${e.par ? `<div class="sub">↔ Alterna con ${esc(pareja(e, a.ej))}: una serie de cada uno.</div>` : ''}
     <div class="sub">${e.s} × ${e.r}${e.x ? ' ' + e.x : ''} · descanso ${e.d} s${e.kg !== null ? ` · sugerido ${e.kgSug} kg` : ''}${e.orig ? ` · cambiado (era ${esc(nombreEj(e.orig))})` : ''}</div>
     ${aprox.length ? `<div class="sub" style="margin-top:4px">Antes, aproximación (no cuenta como serie): ${aprox.map(x => `${String(x.kg).replace('.', ',')} kg × ${x.reps}`).join(' · ')}</div>` : ''}
     ${sinEmpezar ? `<button class="mini" style="background:var(--panel2);margin-top:6px" data-act="cambiarEj" data-v="${e.id}">↔ No puedo hacerlo</button>` : ''}
@@ -649,7 +654,10 @@ async function pantallaEncendida() {
 // ---------- acciones ----------
 function siguienteTxt(k) {
   const a = db.actual, todas = a.ej.flatMap(e => Array.from({ length: e.s }, (_, i) => [`${e.id}:${i}`, e.n]));
-  const sig = todas.find(([kk]) => kk !== k && !a.hechos[kk]);
+  // En series alternadas, lo siguiente es la próxima serie pendiente de la pareja.
+  const e = a.ej.find(x => x.id === k.split(':')[0]), p = e?.par && a.ej.find(x => (x.orig ?? x.id) === e.par);
+  const dePar = p && todas.find(([kk]) => kk.startsWith(p.id + ':') && !a.hechos[kk]);
+  const sig = dePar || todas.find(([kk]) => kk !== k && !a.hechos[kk]);
   return sig ? `Descanso · sigue: ${sig[1]}` : 'Descanso';
 }
 
@@ -727,7 +735,7 @@ const acciones = {
   sustituirEj: el => {
     const a = db.actual, i = a.ej.findIndex(x => x.id === el.dataset.v);
     if (i < 0) return;
-    const n = L.sustituir(a.ej[i], el.dataset.n); // series ya hechas no se pierden: solo se cambia si no empezó
+    const n = { ...L.sustituir(a.ej[i], el.dataset.n), ...(a.ej[i].par && { par: a.ej[i].par, d: a.ej[i].d }) }; // series ya hechas no se pierden: solo se cambia si no empezó; conserva la pareja
     a.ej[i] = { ...n, kgSug: L.sugerirKg(db.sesiones, n, rpeMax(a.rpe)) }; cambiandoEj = null; guardar(); render();
   },
   planEmpezar: () => {
