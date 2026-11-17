@@ -161,15 +161,15 @@ function vistaInicio() {
     ['mov', hp?.ses ? `🏃 ${hp.ses.n}` : '🚶 Caminar o movilidad 20 min'],
     ['agua', nut ? `💧 Agua ${String(nut.agua).replace(".", ",")} L` : '💧 Llevar la botella de agua'],
     ['prot', nut ? `🍗 Proteína ${nut.prot} g` : '🍗 Proteína en cada comida'],
-    ['snack', '🍎 Snack saludable'], ['elongar', '🧘 Elongar 10 min'], ['sueno', '😴 Dormir 7 h o más'],
+    ['creatina', '💊 Tomar creatina (3–5 g)'], ['snack', '🍎 Snack saludable'], ['elongar', '🧘 Elongar 10 min'], ['sueno', '😴 Dormir 7 h o más'],
   ];
   const puntos = Array.from({ length: 28 }, (_, i) => { const f = L.sumarDias(hoy, i - 27);
-    return `<span style="width:10px;height:10px;border-radius:50%;background:${L.diaCumplido(db.basicos[f]) ? 'var(--ok)' : 'var(--panel2)'};${f === hoy ? 'border:2px solid #fff;box-sizing:border-box' : ''}"></span>`; }).join('');
+    return `<span style="width:10px;height:10px;border-radius:50%;background:${L.diaCumplido(db.basicos[f], f) ? 'var(--ok)' : 'var(--panel2)'};${f === hoy ? 'border:2px solid #fff;box-sizing:border-box' : ''}"></span>`; }).join('');
   const deHoy = db.actividad.filter(a => a.fecha === hoy);
   return `<div class="sub" style="letter-spacing:.04em"><b style="color:var(--ac)">BaM</b> · Becoming a Machine</div>
   <h1>${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
   <div class="card"><h2>Metas de hoy <span class="sub">🔥 ${racha.actual} días</span></h2>
-    <div class="sub">mejor racha ${racha.mejor} · cuenta si te mueves y cumples 4 de 6</div>
+    <div class="sub">mejor racha ${racha.mejor} · cuenta si te mueves y cumples ${L.metasMinimas(hoy)} de ${metas.length}</div>
     ${metas.map(([k, t]) => `<label class="switch" style="padding:8px 0"><span>${t}</span><input type="checkbox" data-act="basico" data-v="${k}" ${b[k] ? 'checked' : ''}></label>`).join('')}
     <div class="fila" style="gap:4px;margin-top:8px">${puntos}</div></div>
   <div class="card"><h2>Registrar actividad</h2>
@@ -543,12 +543,13 @@ function vistaTonelaje() {
 }
 
 function vistaAvance() {
-  const r = L.resumenSemana(db.sesiones), nv = L.niveles(db.sesiones);
+  const r = L.resumenSemana(db.sesiones), nv = L.niveles(db.sesiones, db.perfil, db.pesos), antes = L.niveles(db.sesiones, db.perfil, db.pesos, L.sumarDias(diaHoy(), -28));
   const conKg = [...new Set(db.sesiones.flatMap(s => s.series.filter(x => x.kg !== null && x.kg !== undefined).map(x => x.ex)))];
   if (!conKg.includes(exSel)) exSel = conKg[0];
   return `<h1>Avance semanal</h1>
   <div class="card"><div class="fila" style="justify-content:space-around;text-align:center">${stat(`${r.sesiones}/${L.META}`, 'sesiones')}${stat(r.minutos, 'minutos')}${stat(r.series, 'series')}</div></div>
-  <div class="card"><h2>Nivel por grupo <span class="sub">· últimas 4 semanas</span></h2>${radar(nv)}</div>
+  <div class="card"><h2>Nivel por grupo</h2>${radar(nv, antes)}</div>
+  <div class="card"><h2>Progresión de los grupos</h2>${progresion(L.progresionNiveles(db.sesiones, db.perfil, db.pesos))}</div>
   <div class="card"><h2>Kilos levantados</h2>${vistaTonelaje()}</div>
   <div class="card"><h2>Evolución de la carga</h2>${conKg.length
     ? `<select data-act="exsel">${conKg.map(id => `<option value="${esc(id)}" ${id === exSel ? 'selected' : ''}>${esc(nombreEj(id))}</option>`).join('')}</select>${grafico(L.serieKg(db.sesiones, exSel))}`
@@ -579,18 +580,47 @@ function detalleSesion(s) {
   }).join('')}</div>`;
 }
 
-function radar(nv) {
-  const gs = Object.keys(L.GRUPOS), c = 160, R = 95;
+// Hexágono de niveles: cada anillo es un nivel (Básico, Intermedio, Avanzado); línea sólida = hoy, punteada = hace 4 semanas.
+function radar(nv, antes) {
+  if (!L.pesoEn(db.perfil, db.pesos)) return '<div class="sub">Ingresa tu peso en ☰ Mis datos o en Nutrición: el nivel se calcula con la fuerza relativa a tu peso.</div>';
+  const gs = Object.keys(L.NIVEL_REF), c = 160, R = 95, v = (n, g) => (n[g]?.puntaje ?? 0) / 3;
   const pt = (i, f) => { const a = -Math.PI / 2 + i * 2 * Math.PI / gs.length; return [c + Math.cos(a) * R * f, c + Math.sin(a) * R * f]; };
-  const poly = f => gs.map((_, i) => pt(i, typeof f === 'function' ? f(i) : f).map(v => v.toFixed(1)).join(',')).join(' ');
-  return `<svg viewBox="0 0 320 320" width="100%" style="max-width:360px;display:block;margin:auto" role="img" aria-label="Nivel por grupo muscular">
-    ${[.25, .5, .75, 1].map(f => `<polygon points="${poly(f)}" fill="none" stroke="#33405f"/>`).join('')}
+  const poly = f => gs.map((_, i) => pt(i, typeof f === 'function' ? f(i) : f).map(x => x.toFixed(1)).join(',')).join(' ');
+  const hayAntes = gs.some(g => antes[g]);
+  return `<svg viewBox="0 0 320 320" width="100%" style="max-width:360px;display:block;margin:auto" role="img" aria-label="Nivel de fuerza por grupo muscular">
+    ${[1 / 3, 2 / 3, 1].map((f, k) => `<polygon points="${poly(f)}" fill="${['rgba(229,72,77,.06)', 'rgba(240,180,41,.06)', 'rgba(63,185,80,.06)'][k]}" stroke="#33405f"/>
+      <text x="${c + 3}" y="${c - R * f + 11}" style="font-size:9px;fill:#8b98b8">${L.NIVELES[k]}</text>`).join('')}
     ${gs.map((_, i) => `<line x1="${c}" y1="${c}" x2="${pt(i, 1)[0]}" y2="${pt(i, 1)[1]}" stroke="#33405f"/>`).join('')}
-    <polygon points="${poly(i => Math.max(.03, nv[gs[i]].vol))}" fill="rgba(229,72,77,.3)" stroke="#e5484d" stroke-width="2"/>
-    <polygon points="${poly(i => Math.max(.03, nv[gs[i]].carga))}" fill="rgba(76,141,255,.3)" stroke="#4c8dff" stroke-width="2"/>
-    ${gs.map((g, i) => { const [x, y] = pt(i, 1.3); return `<text x="${x}" y="${y - 6}" text-anchor="middle">${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre.split(' ')[0]}</text><text x="${x}" y="${y + 10}" text-anchor="middle" style="font-weight:600"><tspan style="fill:#e5484d">${Math.round(nv[g].vol * 100)}%</tspan> <tspan style="fill:#4c8dff">+${Math.round(nv[g].subida * 100)}%</tspan></text>`; }).join('')}
+    ${hayAntes ? `<polygon points="${poly(i => Math.max(.02, v(antes, gs[i])))}" fill="none" stroke="#8b98b8" stroke-width="1.5" stroke-dasharray="4 3"/>` : ''}
+    <polygon points="${poly(i => Math.max(.02, v(nv, gs[i])))}" fill="rgba(76,141,255,.3)" stroke="#4c8dff" stroke-width="2"/>
+    ${gs.map((g, i) => { const [x, y] = pt(i, 1.3); return `<text x="${x}" y="${y - 6}" text-anchor="middle">${L.GRUPOS[g].icono} ${L.GRUPOS[g].nombre.split(' ')[0]}</text><text x="${x}" y="${y + 10}" text-anchor="middle" style="font-weight:600;fill:${nv[g] ? COLOR[g] : '#8b98b8'}">${nv[g] ? nv[g].nivel : 'sin datos'}</text>`; }).join('')}
   </svg>
-  <div class="sub" style="text-align:center"><b style="color:#e5484d">■</b> Volumen: series en 4 semanas (24 = 100 %) · <b style="color:#4c8dff">■</b> Carga: subida de kg desde el primer registro (+${L.SUBIDA_TOPE * 100} % llena el eje)</div>`;
+  <div class="sub" style="text-align:center">Línea azul: hoy${hayAntes ? ' · punteada: hace 4 semanas' : ''}. Mejor registro de las últimas ${L.VENTANA_NIVEL} semanas.</div>
+  ${gs.filter(g => nv[g]).map(g => { const n = nv[g]; return `<div class="sub" style="margin-top:6px"><b style="color:${COLOR[g]}">${L.GRUPOS[g].icono} ${n.nivel}</b> · ${esc(nombreEj(n.ex))}: ${n.ex === 'abs_disco' ? 'disco' : '1RM estimado'} ${String(Math.round(n.ratio * 100) / 100).replace('.', ',')} × tu peso${n.falta ? ` · faltan ~${n.falta} kg ${n.ex === 'abs_disco' ? 'de disco' : 'de 1RM'} para ${L.NIVELES[Math.floor(n.puntaje) + 1]}` : ''}</div>`; }).join('')}
+  <details class="sub" style="margin-top:8px"><summary>¿Cómo se calcula?</summary>1RM estimado con la fórmula de Epley (kg × (1 + reps/30), series de hasta 12 repeticiones) dividido por tu peso, en el mejor ejercicio de referencia del grupo. Intermedio / avanzado (× peso, hombres): peso muerto hexagonal ${umbral('piernas', 'pm_hex')}, hack ${umbral('piernas', 'hack')}; remo con barra ${umbral('espalda', 'remo_barra')}, jalón ${umbral('espalda', 'jalon')}; press inclinado ${umbral('empuje', 'press_incl')}, press militar ${umbral('empuje', 'militar')}; curl martillo por mancuerna ${umbral('brazos')}; disco de abdominales ${umbral('core')} (el peso del disco, no el 1RM); kettlebell del swing ${umbral('potencia')}. En mujeres, × ${String(L.SEXO_F).replace('.', ',')}. Son referencias prácticas de tablas de estándares de fuerza, no resultados de un estudio.</details>`;
+}
+const umbral = (g, ex) => { const [a, b] = L.NIVEL_REF[g][ex ?? Object.keys(L.NIVEL_REF[g])[0]]; return `${String(a).replace('.', ',')} / ${String(b).replace('.', ',')}`; };
+
+// Progresión del nivel de cada grupo en el tiempo (0–3), con las franjas de Básico, Intermedio y Avanzado.
+function progresion(pr) {
+  if (!L.pesoEn(db.perfil, db.pesos)) return '<div class="sub">Necesita tu peso para calcular los niveles.</div>';
+  const gs = Object.keys(L.NIVEL_REF).filter(g => pr.some(p => p[g] !== null));
+  if (pr.length < 2 || !gs.length) return '<div class="sub">Aparecerá con dos o más sesiones con peso registrado.</div>';
+  const W = 340, H = 200, x0 = 64, y0 = 12, w = W - x0 - 8, h = H - y0 - 24;
+  const t = pr.map(p => +L.dia(p.fecha)), t0 = t[0], dt = (t.at(-1) - t0) || 1;
+  const X = i => x0 + (t[i] - t0) / dt * w, Y = v => y0 + h - v / 3 * h;
+  const lineas = gs.map(g => { let d = '', pen = false;
+    pr.forEach((p, i) => { if (p[g] === null) { pen = false; return; } d += `${pen ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p[g]).toFixed(1)} `; pen = true; });
+    const u = pr.map((p, i) => [p[g], i]).filter(([v]) => v !== null).at(-1);
+    return `<path d="${d}" fill="none" stroke="${COLOR[g]}" stroke-width="2"/><circle cx="${X(u[1])}" cy="${Y(u[0])}" r="3" fill="${COLOR[g]}"/>`; }).join('');
+  const f = i => L.dia(pr[i].fecha).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Progresión del nivel por grupo">
+    ${[0, 1, 2].map(k => `<rect x="${x0}" y="${Y(k + 1)}" width="${w}" height="${h / 3}" fill="${['rgba(229,72,77,.07)', 'rgba(240,180,41,.07)', 'rgba(63,185,80,.07)'][k]}"/>
+      <text x="${x0 - 4}" y="${Y(k + .5) + 3}" text-anchor="end" style="font-size:10px;fill:#8b98b8">${L.NIVELES[k]}</text>`).join('')}
+    ${lineas}
+    <text x="${x0}" y="${H - 6}" style="font-size:10px;fill:#8b98b8">${f(0)}</text><text x="${W - 8}" y="${H - 6}" text-anchor="end" style="font-size:10px;fill:#8b98b8">${f(pr.length - 1)}</text>
+  </svg>
+  <div class="fila sub" style="justify-content:center;gap:10px">${gs.map(g => `<span><b style="color:${COLOR[g]}">●</b> ${L.GRUPOS[g].nombre.split(' ')[0]}</span>`).join('')}</div>`;
 }
 
 function grafico(pts, nota = 'kg máximo por sesión') {

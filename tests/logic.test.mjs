@@ -41,10 +41,33 @@ const lg = Object.fromEntries(L.logros(hist, new Date('2026-10-31T10:00:00')).ma
 assert.ok(lg['🎯'] && lg['🏆'] && lg['🔥'] && lg['🌧️'] && !lg['🔷']);
 
 // Niveles y clima
-const nv = L.niveles(hist, new Date('2026-10-31'));
-assert.ok(nv.piernas.vol > 0 && nv.espalda.vol === 0);
-assert.ok(Math.abs(nv.piernas.subida - (75 / 70 - 1)) < 1e-9); // 70 kg → 75 kg
-assert.ok(Math.abs(nv.piernas.carga - (75 / 70 - 1) / L.SUBIDA_TOPE) < 1e-9 && nv.espalda.carga === 0);
+// Nivel por grupo: 1RM estimado / peso corporal contra umbrales de intermedio y avanzado
+assert.equal(Math.round(L.e1rm(100, 5) * 10) / 10, 116.7); assert.equal(L.e1rm(100, 15), 0); assert.equal(L.e1rm(null, 5), 0);
+{
+  const s = (fecha, ex, kg, reps) => ({ fecha, series: [{ ex, g: 'x', kg, reps }] });
+  const H = [s('2026-09-01', 'pm_hex', 80, 5), s('2026-10-01', 'pm_hex', 100, 5), s('2026-10-01', 'press_incl', 60, 3), s('2026-10-02', 'remo_barra', 70, 8)];
+  const yo = { peso: 80, sexo: 'h' }, n = L.niveles(H, yo, [], '2026-10-05');
+  // pm_hex: 100 × (1 + 5/30) = 116,7 → 1,46 × peso: intermedio (entre 1,25 y 1,75)
+  assert.equal(n.piernas.nivel, 'Intermedio'); assert.equal(n.piernas.ex, 'pm_hex');
+  assert.ok(Math.abs(n.piernas.puntaje - (1 + (116.666 / 80 - 1.25) / 0.5)) < 1e-3);
+  assert.equal(n.piernas.falta, Math.ceil((1.75 - 116.6667 / 80) * 80)); // kg de 1RM que faltan para avanzado
+  assert.equal(n.empuje.nivel, 'Intermedio');               // 66 kg / 80 = 0,83
+  assert.equal(n.espalda.nivel, 'Avanzado');                // 88,7 / 80 = 1,11 ≥ 1,0
+  assert.equal(n.brazos, null); assert.equal(n.core, null);  // sin registros
+  // Core: cuenta el peso del disco aunque sea a 20 repeticiones (8 kg / 80 = 0,1 → justo intermedio)
+  assert.equal(L.niveles([...H, s('2026-10-03', 'abs_disco', 8, 20)], yo, [], '2026-10-05').core.nivel, 'Intermedio');
+  // Mujer: umbrales × 0,65 → el mismo registro da más nivel
+  assert.equal(L.niveles(H, { peso: 80, sexo: 'm' }, [], '2026-10-05').piernas.nivel, 'Avanzado');
+  // Sin peso no hay nivel; el último peso registrado manda sobre el del perfil
+  assert.equal(L.niveles(H, {}, [], '2026-10-05').piernas, null);
+  assert.equal(L.pesoEn({ peso: 80 }, [{ fecha: '2026-09-15', kg: 90 }, { fecha: '2026-11-01', kg: 70 }], '2026-10-05'), 90);
+  // Ventana de 8 semanas: en diciembre ya no cuenta lo de septiembre/octubre
+  assert.equal(L.niveles(H, yo, [], '2026-12-20').piernas, null);
+  // Progresión: un punto por fecha con kg; en septiembre básico, en octubre intermedio
+  const pr = L.progresionNiveles(H, yo);
+  assert.deepEqual(pr.map(x => x.fecha), ['2026-09-01', '2026-10-01', '2026-10-02']);
+  assert.ok(pr[0].piernas < 1 && pr[1].piernas >= 1 && pr[0].empuje === null);
+}
 assert.equal(L.interpretarClima(0).min, 75);
 assert.equal(L.interpretarClima(61).lluvia, true);
 assert.equal(L.interpretarClima(3, 80).txt, 'Lluvia');
@@ -131,6 +154,9 @@ const b = { mov: true, agua: true, prot: true, sueno: true };
 const bas = { '2026-10-25': b, '2026-10-26': b, '2026-10-27': { ...b, mov: false }, '2026-10-28': b, '2026-10-29': { mov: true } };
 assert.deepEqual(L.racha(bas, '2026-10-29'), { actual: 1, mejor: 2 }); // hoy aún no cumple: no corta
 assert.equal(L.racha({ ...bas, '2026-10-29': b }, '2026-10-29').actual, 2);
+// Desde que se sumó la creatina (7 metas) hacen falta 5; los días anteriores siguen con 4 y la racha no cambia
+assert.ok(L.diaCumplido(b, '2026-11-16') && !L.diaCumplido(b, '2026-11-17') && L.diaCumplido({ ...b, creatina: true }, '2026-11-17'));
+assert.equal(L.racha({ '2026-11-16': b, '2026-11-17': { ...b, creatina: true } }, '2026-11-17').actual, 2);
 
 // Dieta: déficit/superávit según objetivo, más carbohidrato el día de fuerza, menú que suma la meta (±5 %)
 const yo = { peso: 80, altura: 178, edad: 32, sexo: 'h' };

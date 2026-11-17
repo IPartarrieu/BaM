@@ -277,23 +277,54 @@ export function tonelajeMedio(sesiones, desde = 0) {
   return { sesiones: ss.length, media: media(ss.map(s => tonelaje(s.series))), grupos: Object.fromEntries(Object.entries(grupos).map(([g, v]) => [g, { media: media(v), sesiones: v.length }])) };
 }
 
-// Nivel por grupo, dos ejes 0–1:
-//  vol   = series hechas en los últimos 28 días contra 24 (≈ 1 sesión completa del grupo por semana)
-//  carga = subida promedio del kg máximo de cada ejercicio respecto a su primer registro; +25 % llena el eje
-export const SUBIDA_TOPE = 0.25;
-export function niveles(sesiones, fecha = new Date()) {
-  const desde = new Date(fecha) - 28 * 864e5;
-  const todas = sesiones.flatMap(s => s.series.map(x => ({ ...x, f: new Date(s.fecha) }))).sort((a, b) => a.f - b.f);
-  return Object.fromEntries(Object.keys(GRUPOS).map(g => {
-    const series = todas.filter(x => x.g === g);
-    const vol = Math.min(1, series.filter(x => x.f >= desde).length / 24);
-    const subidas = [...new Set(series.map(x => x.ex))].map(ex => {
-      const kgs = series.filter(x => x.ex === ex && +x.kg > 0).map(x => +x.kg);
-      return kgs.length > 1 ? Math.max(...kgs) / kgs[0] - 1 : null;
-    }).filter(v => v !== null);
-    const subida = subidas.length ? subidas.reduce((a, b) => a + b, 0) / subidas.length : 0;
-    return [g, { vol, subida, carga: Math.min(1, Math.max(0, subida / SUBIDA_TOPE)) }];
+// ---------- Nivel de fuerza por grupo: Básico, Intermedio, Avanzado ----------
+// Fuerza relativa = 1RM estimado (Epley: kg × (1 + reps/30), series de ≤ 12 reps) / peso corporal, en el mejor ejercicio de referencia
+// del grupo. Umbrales [intermedio, avanzado] en × peso corporal, para hombres; en mujeres se multiplican por SEXO_F (tablas de
+// estándares de fuerza de uso común: referencia práctica, no un estudio). Se usa el mejor registro de las últimas VENTANA_NIVEL
+// semanas, así el nivel baja si dejas de entrenar.
+// Puntaje continuo 0–3: 0–1 Básico (camino a intermedio), 1–2 Intermedio, 2–3 Avanzado (3 = 25 % sobre el umbral avanzado).
+export const NIVEL_REF = {
+  piernas: { pm_hex: [1.25, 1.75], hack: [1.5, 2.25] },   // la hack carga más que una barra (el carro ayuda)
+  espalda: { remo_barra: [0.75, 1.0], jalon: [0.8, 1.1] },
+  empuje: { press_incl: [0.75, 1.0], militar: [0.5, 0.7] },
+  brazos: { curl_mart: [0.15, 0.25] },          // por mancuerna
+  core: { abs_disco: [0.1, 0.2] },               // peso del disco (no 1RM: se hace a 20 repeticiones)
+  potencia: { swing: [0.2, 0.3] },               // kettlebell
+};
+export const NIVELES = ['Básico', 'Intermedio', 'Avanzado'];
+export const SEXO_F = 0.65, VENTANA_NIVEL = 8;
+export const e1rm = (kg, reps) => +kg > 0 && +reps > 0 && +reps <= 12 ? +kg * (1 + +reps / 30) : 0;
+const CARGA_DIRECTA = new Set(['abs_disco']); // se compara la carga usada, no el 1RM
+const fuerzaDe = (ex, x) => CARGA_DIRECTA.has(ex) ? +x.kg || 0 : e1rm(x.kg, x.reps);
+export const nivelTxt = x => NIVELES[Math.min(2, Math.floor(x))];
+const puntaje = (r, [a, b]) => r < a ? r / a : r < b ? 1 + (r - a) / (b - a) : Math.min(3, 2 + (r - b) / (b * .25));
+
+// Peso corporal a una fecha: el último registro de peso hasta ese día; si no hay, el del perfil.
+export const pesoEn = (perfil, pesos = [], fecha = new Date()) =>
+  +([...pesos].filter(x => x.fecha <= iso(fecha)).sort((a, b) => a.fecha < b.fecha ? -1 : 1).at(-1)?.kg ?? perfil?.peso) || 0;
+
+// Nivel de cada grupo a una fecha: { g: { puntaje, nivel, ex, ratio, falta } } (null si no hay registros o peso).
+// falta = kg de 1RM estimado que faltan para el siguiente nivel en ese ejercicio.
+export function niveles(sesiones, perfil = {}, pesos = [], fecha = new Date()) {
+  const bw = pesoEn(perfil, pesos, fecha), f = perfil?.sexo === 'm' ? SEXO_F : 1;
+  const hasta = +new Date(fecha) + 864e5, desde = hasta - VENTANA_NIVEL * 7 * 864e5;
+  const mejor = {};
+  for (const s of sesiones) { const t = +new Date(s.fecha); if (t < desde || t >= hasta) continue;
+    for (const x of s.series) mejor[x.ex] = Math.max(mejor[x.ex] ?? 0, fuerzaDe(x.ex, x)); }
+  return Object.fromEntries(Object.entries(NIVEL_REF).map(([g, refs]) => {
+    if (!bw) return [g, null];
+    const op = Object.entries(refs).filter(([ex]) => mejor[ex] > 0).map(([ex, [a, b]]) => {
+      const u = [a * f, b * f], ratio = mejor[ex] / bw, p = puntaje(ratio, u);
+      return { ex, ratio, puntaje: p, nivel: nivelTxt(p), falta: p < 2 ? Math.ceil((u[p < 1 ? 0 : 1] - ratio) * bw) : 0 };
+    }).sort((x, y) => y.puntaje - x.puntaje);
+    return [g, op[0] ?? null];
   }));
+}
+
+// Progresión: nivel de cada grupo en cada fecha con sesión de fuerza. [{ fecha, g: puntaje | null }]
+export function progresionNiveles(sesiones, perfil = {}, pesos = []) {
+  const fechas = [...new Set(sesiones.filter(s => s.series?.some(x => +x.kg > 0)).map(s => iso(s.fecha)))].sort();
+  return fechas.map(fecha => ({ fecha, ...Object.fromEntries(Object.entries(niveles(sesiones, perfil, pesos, fecha)).map(([g, n]) => [g, n?.puntaje ?? null])) }));
 }
 
 // Máximo kg por sesión para un ejercicio: [{fecha, kg}]
@@ -624,13 +655,16 @@ export function animoPal(d, comido, hora = 12) {
   return { cara: 1, msg: `Vamos bien: quedan ${Math.round(d.kcal - comido.kcal)} kcal para hoy.` };
 }
 
-// Metas del día. Cuenta para la racha si te moviste y cumpliste al menos 4 de las 6.
-export const diaCumplido = b => !!b?.mov && Object.values(b).filter(v => v === true).length >= 4;
+// Metas del día. Cuenta para la racha si te moviste y cumpliste al menos 5 de las 7 (desde que se sumó la creatina;
+// antes, 4 de 6, para no cambiar la racha ya hecha).
+export const DESDE_CREATINA = '2026-11-17';
+export const metasMinimas = f => !f || f >= DESDE_CREATINA ? 5 : 4;
+export const diaCumplido = (b, f) => !!b?.mov && Object.values(b).filter(v => v === true).length >= metasMinimas(f);
 export function racha(basicos, hoy = iso(new Date())) {
-  let n = 0, f = diaCumplido(basicos[hoy]) ? hoy : sumarDias(hoy, -1); // hoy no corta la racha hasta que termine
-  while (diaCumplido(basicos[f])) { n++; f = sumarDias(f, -1); }
+  let n = 0, f = diaCumplido(basicos[hoy], hoy) ? hoy : sumarDias(hoy, -1); // hoy no corta la racha hasta que termine
+  while (diaCumplido(basicos[f], f)) { n++; f = sumarDias(f, -1); }
   let mejor = 0, run = 0, prev = null;
-  for (const d of Object.keys(basicos).filter(d => diaCumplido(basicos[d])).sort()) {
+  for (const d of Object.keys(basicos).filter(d => diaCumplido(basicos[d], d)).sort()) {
     run = prev && sumarDias(prev, 1) === d ? run + 1 : 1; mejor = Math.max(mejor, run); prev = d;
   }
   return { actual: n, mejor };

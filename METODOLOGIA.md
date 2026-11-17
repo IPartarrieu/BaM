@@ -87,7 +87,17 @@ Con objetivo, peso, altura, edad y sexo la app pasa de gramos por kg a una dieta
 
 ## 5. Metas diarias y rachas
 
-Las metas diarias son simples y dependen del plan: moverse (la sesión del día o, en días libres, 20 min de caminata o movilidad), agua, proteína, snack saludable, elongar y dormir 7 h o más. **Un día cuenta para la racha si te moviste y cumpliste al menos 4 de las 6 metas.** Así un día imperfecto no rompe la racha, pero no moverse sí. El día de hoy no corta la racha mientras no termine.
+Las metas diarias son simples y dependen del plan: moverse (la sesión del día o, en días libres, 20 min de caminata o movilidad), agua, proteína, tomar creatina (3–5 g/día, ver §4), snack saludable, elongar y dormir 7 h o más. **Un día cuenta para la racha si te moviste y cumpliste al menos 5 de las 7 metas.** Los días anteriores al 17-nov-2026 (cuando se sumó la creatina) siguen contando con 4 de 6, así la racha ya hecha no cambia. Así un día imperfecto no rompe la racha, pero no moverse sí. El día de hoy no corta la racha mientras no termine.
+
+## 5.1 Nivel por grupo (pestaña Avance)
+
+El hexágono muestra el **nivel de fuerza** de cada grupo: Básico, Intermedio o Avanzado (`NIVEL_REF`, `niveles`).
+
+- **Fuerza relativa** = 1RM estimado / peso corporal. El 1RM se estima con Epley, kg × (1 + reps/30), solo con series de hasta 12 repeticiones (sobre eso la estimación pierde precisión). En el core se usa el peso del disco, porque se hace a 20 repeticiones.
+- **Ejercicio de referencia** por grupo (cuenta el mejor): piernas = peso muerto hexagonal (1,25 / 1,75 × peso para intermedio / avanzado) o hack (1,5 / 2,25, más alto porque el carro de la máquina ayuda); espalda = remo con barra (0,75 / 1,0) o jalón (0,8 / 1,1); pecho y hombros = press inclinado (0,75 / 1,0) o press militar (0,5 / 0,7); brazos = curl martillo por mancuerna (0,15 / 0,25); core = disco (0,1 / 0,2); potencia = kettlebell del swing (0,2 / 0,3). En mujeres los umbrales se multiplican por 0,65.
+- Son **referencias prácticas** tomadas de tablas de estándares de fuerza de uso común y ajustadas a estos ejercicios, no resultados de un estudio. Sirven para ver el avance, no para comparar con otras personas.
+- Se usa el mejor registro de las **últimas 8 semanas**, así el nivel baja si se deja de entrenar. El peso corporal es el último registrado hasta esa fecha (o el del perfil).
+- **Puntaje** continuo 0–3: 0–1 Básico, 1–2 Intermedio, 2–3 Avanzado (3 = 25 % sobre el umbral avanzado). El hexágono marca hoy y, punteado, hace 4 semanas; el gráfico «Progresión de los grupos» muestra el puntaje de cada grupo en cada sesión con kg (`progresionNiveles`). También dice cuántos kg de 1RM faltan para el siguiente nivel.
 
 ## 6. Diseño de la sesión de fuerza («Acerca de»)
 
